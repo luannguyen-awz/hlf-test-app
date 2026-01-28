@@ -11,7 +11,7 @@ on:
 env:
   AWS_REGION: ap-southeast-1
   ECR_REPOSITORY: hlf-lab-ecr-sit-test-app
-  EKS_CLUSTER_NAME: hlf-lab-eks-sit
+  EKS_CLUSTER_NAME: hlf-lab-eks-sit-cluster
   
 permissions:
   id-token: write
