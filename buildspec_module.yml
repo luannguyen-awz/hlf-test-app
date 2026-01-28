@@ -2,36 +2,75 @@ version: 0.2
 
 env:
   variables:
-    AWS_DEFAULT_REGION: "<REDACTED>"
-    EKS_CLUSTER_NAME: "<REDACTED>"
+    AWS_DEFAULT_REGION: "ap-southeast-1"
+    EKS_CLUSTER_NAME: "hlf-eks-sit"
+    APP_NAMESPACE: "test-app"
+    ENVIRONMENT: "sit"
+    MODULE_ENABLE: "true"
 
 phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - echo "Installing dependencies..."
+      
+  pre_build:
+    commands:
+      - echo "Pre-build phase started..."
+      - echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID"
+      - echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
+      - echo "EKS_CLUSTER_NAME=$EKS_CLUSTER_NAME"
+      - echo "CODEBUILD_RESOLVED_SOURCE_VERSION=$CODEBUILD_RESOLVED_SOURCE_VERSION"
+      
   build:
     commands:
       - |
-        echo "X_ENABLE=$X_ENABLE, X_ENABLE=$X_ENABLE, X_ENABLE=$X_ENABLE, X_ENABLE=$X_ENABLE"
+        echo "MODULE_ENABLE=$MODULE_ENABLE"
 
-        if [ "$X_ENABLE" = "false" ] && [ "$X_ENABLE" = "false" ] && [ "$X_ENABLE" = "false" ] && [ "$X_ENABLE" = "false" ]; then
-          echo "All module flags are false. Skipping module deployment..."
+        if [ "$MODULE_ENABLE" = "false" ]; then
+          echo "Module deployment flag is false. Skipping module deployment..."
         else
-          echo "At least one module is enabled. Proceeding with deployment..."
+          echo "Module is enabled. Proceeding with deployment..."
 
+          # Install kubectl
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.33.0/bin/linux/amd64/kubectl
+          chmod +x kubectl
+          mv ./kubectl /usr/local/bin/kubectl
+          
+          # Install aws-iam-authenticator
           curl -o aws-iam-authenticator https://s3.us-west-2.amazonaws.com/amazon-eks/1.21.2/2021-07-05/bin/linux/amd64/aws-iam-authenticator
           chmod +x ./aws-iam-authenticator
           mkdir -p $HOME/bin && cp ./aws-iam-authenticator $HOME/bin/aws-iam-authenticator && export PATH=$PATH:$HOME/bin
           
-          curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubectl
-          chmod +x kubectl
-          mv ./kubectl /usr/local/bin/kubectl
-          
+          # Install Helm
           curl -sSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
           
+          # Verify installations
           helm version
-          git --version
+          kubectl version --client
+          aws --version
+          
+          # Configure kubectl for EKS
           aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $EKS_CLUSTER_NAME
+          
+          # Verify cluster connectivity
+          kubectl cluster-info
+          kubectl get nodes
 
           ls -alht
           chmod +x ./script/deploy_module.sh
+          
+          # Set image tag from git commit or use latest
+          export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+          export ECR_REPOSITORY_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/hlf-ecr-sit-test-app"
+          
+          # Execute deployment script
           ./script/deploy_module.sh
         fi
       - echo "Module deployment step finished!!!"
+      
+  post_build:
+    commands:
+      - echo "Post-build phase completed"
+      - echo "Deployment completed successfully"

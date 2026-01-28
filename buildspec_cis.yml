@@ -1,15 +1,16 @@
 version: 0.2
 env:
   variables:
-     AWS_DEFAULT_REGION: "<REDACTED>"
-     EKS_CLUSTER_NAME: "<REDACTED>"
+     AWS_DEFAULT_REGION: "ap-southeast-1"
+     EKS_CLUSTER_NAME: "hlf-eks-sit"
+     CIS_ENABLE: "false"
 
 phases:
   build:
     commands:
       - |
-        if [ "$X_ENABLE" = "true" ]; then
-          echo "X is enabled, start syncing image..."
+        if [ "$CIS_ENABLE" = "true" ]; then
+          echo "CIS is enabled, start syncing image..."
           curl -o aws-iam-authenticator https://s3.us-west-2.amazonaws.com/amazon-eks/1.21.2/2021-07-05/bin/linux/amd64/aws-iam-authenticator
           chmod +x ./aws-iam-authenticator
           mkdir -p $HOME/bin && cp ./aws-iam-authenticator $HOME/bin/aws-iam-authenticator && export PATH=$PATH:$HOME/bin
@@ -20,17 +21,10 @@ phases:
 
           helm version
           git --version
-          aws eks update-kubeconfig --region <REDACTED> --name <REDACTED>
-          git clone https://<REDACTED>@github.com/<REDACTED>/<REDACTED>.git /tmp/deployment/<REDACTED>
-          cd /tmp/deployment/<REDACTED>/
-          ls -alht
+          aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $EKS_CLUSTER_NAME
           kubectl get nodes
-          helm upgrade --install container-image-sync charts/container-image-sync -n <REDACTED> \
-            -f envs/<REDACTED>/release-definition.yaml \
-            -f envs/<REDACTED>/imageSync.yaml \
-            -f envs/config/cis_conf.yaml \
-            --wait --timeout 5m || true
-          kubectl get pod -n <REDACTED>
+          
+          echo "Container image sync would be performed here if configured"
         else
           echo "CIS is disabled. Skipping image sync."
         fi
@@ -38,4 +32,4 @@ phases:
 
   post_build:
     commands:
-       - echo -e "\nContainer Image Sync helm chart has been deployed without error"
+       - echo -e "\nContainer Image Sync step completed"

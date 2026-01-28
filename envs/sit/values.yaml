@@ -1,0 +1,42 @@
+# SIT Environment Configuration
+
+replicaCount: 2
+
+image:
+  repository: 337608386221.dkr.ecr.ap-southeast-1.amazonaws.com/hlf-ecr-sit-test-app
+  pullPolicy: Always
+  tag: "latest"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+
+environment: sit
+
+# Database configuration (from RDS stack)
+database:
+  enabled: true
+  host: "rds-endpoint.ap-southeast-1.rds.amazonaws.com"  # Replace with actual RDS endpoint
+  port: 3306
+  name: hlfdb
+  username: admin
+
+# Application configuration
+app:
+  logLevel: debug
+  port: 8080
+
+ingress:
+  enabled: false
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
