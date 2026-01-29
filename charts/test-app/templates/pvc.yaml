@@ -1,4 +1,9 @@
 {{- if .Values.persistence.enabled }}
+{{- if eq .Values.persistence.provisioningMode "static" }}
+# Static Provisioning: Use pre-created PV (for Fargate)
+# PV and PVC should be created separately via manifests/storage/efs-pv-static.yaml
+{{- else }}
+# Dynamic Provisioning: Use StorageClass (requires EC2 nodes for EFS CSI controller)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -8,8 +13,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
-  storageClassName: efs-sc
+  storageClassName: {{ .Values.persistence.storageClass }}
   resources:
     requests:
       storage: {{ .Values.persistence.size }}
+{{- end }}
 {{- end }}

@@ -46,4 +46,6 @@ persistence:
   enabled: true
   size: 10Gi
   mountPath: /app/data
-  storageClass: efs-sc
+  storageClass: ""
+  provisioningMode: static  # Fargate only supports static provisioning
+  existingClaim: efs-pvc

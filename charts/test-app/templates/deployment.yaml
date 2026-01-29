@@ -40,20 +40,14 @@ spec:
         envFrom:
         - configMapRef:
             name: {{ include "test-app.fullname" . }}-config
-        {{- if .Values.database.enabled }}
-        # Use External Secrets for database credentials
-        - secretRef:
-            name: rds-database-secret
-            optional: true
-        {{- end }}
         env:
         {{- if .Values.database.enabled }}
-        # Legacy support: fallback to manual secret if External Secrets not available
-        - name: DB_PASSWORD_FALLBACK
+        # Database password from External Secrets
+        - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "test-app.fullname" . }}-db-secret
-              key: password
+              name: rds-database-secret
+              key: DB_PASSWORD
               optional: true
         {{- end }}
         livenessProbe:
@@ -83,7 +77,11 @@ spec:
       volumes:
       - name: app-data
         persistentVolumeClaim:
+          {{- if eq .Values.persistence.provisioningMode "static" }}
+          claimName: {{ .Values.persistence.existingClaim }}
+          {{- else }}
           claimName: {{ include "test-app.fullname" . }}-data
+          {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

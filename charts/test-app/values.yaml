@@ -89,3 +89,7 @@ persistence:
   size: 10Gi
   mountPath: /app/data
   storageClass: efs-sc
+  # Provisioning mode: static (for Fargate) or dynamic (requires EC2 nodes)
+  provisioningMode: static
+  # PVC name for static provisioning (should match the PVC in manifests/storage/efs-pv-static.yaml)
+  existingClaim: efs-pvc

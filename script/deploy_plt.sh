@@ -57,24 +57,25 @@ echo "EFS File System ID: ${EFS_FILE_SYSTEM_ID}"
 
 # Deploy EFS StorageClass
 echo "=========================================="
-echo "Deploying EFS StorageClass..."
+echo "Deploying EFS Storage (Static Provisioning for Fargate)..."
 echo "=========================================="
 
-if [ -f "./manifests/storage/storageclass-efs.yaml" ]; then
+if [ -f "./manifests/storage/efs-pv-static.yaml" ]; then
     # Create a temporary file with EFS_FILE_SYSTEM_ID replaced
     TEMP_FILE=$(mktemp)
-    sed "s/\${EFS_FILE_SYSTEM_ID}/${EFS_FILE_SYSTEM_ID}/g" ./manifests/storage/storageclass-efs.yaml > "$TEMP_FILE"
+    sed "s/\${EFS_FILE_SYSTEM_ID}/${EFS_FILE_SYSTEM_ID}/g" ./manifests/storage/efs-pv-static.yaml > "$TEMP_FILE"
     
-    echo "Applying EFS StorageClass..."
+    echo "Creating EFS PersistentVolume and PersistentVolumeClaim..."
     kubectl apply -f "$TEMP_FILE"
     
     # Clean up temp file
     rm -f "$TEMP_FILE"
     
-    echo "EFS StorageClass deployed successfully"
-    kubectl get storageclass efs-sc || true
+    echo "EFS PV and PVC created successfully"
+    kubectl get pv | grep efs || true
+    kubectl get pvc -n default | grep efs || true
 else
-    echo "WARNING: EFS StorageClass manifest not found"
+    echo "WARNING: EFS PV manifest not found"
 fi
 
 # Deploy platform components

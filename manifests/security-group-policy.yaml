@@ -1,0 +1,17 @@
+apiVersion: vpcresources.k8s.aws/v1beta1
+kind: SecurityGroupPolicy
+metadata:
+  name: rds-access-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: test-app
+  securityGroups:
+    groupIds:
+      # AWS Requirement: Include cluster security group for control plane communication (Fargate)
+      # This will be replaced during deployment with actual EKS Cluster Security Group ID
+      - sg-placeholder-eks-cluster
+      # Pod-specific security group for RDS access
+      # This will be replaced during deployment with actual EKS Pod Security Group ID
+      - sg-placeholder-eks-pod

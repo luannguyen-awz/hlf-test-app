@@ -62,7 +62,88 @@ echo "Checking Kubernetes connectivity..."
 kubectl cluster-info
 kubectl get nodes
 
-# Apply External Secrets manifests if exist
+# Get RDS connection information from CloudFormation
+echo "=========================================="
+echo "Getting RDS connection info from CloudFormation..."
+echo "=========================================="
+
+# Get RDS Stack ID
+RDS_STACK_ID=$(aws cloudformation describe-stack-resources \
+    --stack-name "${STACK_NAME}" \
+    --region "${AWS_REGION}" \
+    --query 'StackResources[?LogicalResourceId==`RDSStack`].PhysicalResourceId' \
+    --output text)
+
+if [ -z "$RDS_STACK_ID" ]; then
+    echo "ERROR: Could not find RDS Stack!"
+    exit 1
+fi
+
+echo "RDS Stack ID: ${RDS_STACK_ID}"
+
+# Get RDS connection details from CloudFormation outputs
+DB_HOST=$(aws cloudformation describe-stacks \
+    --stack-name "${RDS_STACK_ID}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`ClusterEndpoint`].OutputValue' \
+    --output text)
+
+DB_PORT=$(aws cloudformation describe-stacks \
+    --stack-name "${RDS_STACK_ID}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`ClusterPort`].OutputValue' \
+    --output text)
+
+DB_NAME=$(aws cloudformation describe-stacks \
+    --stack-name "${RDS_STACK_ID}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`DatabaseName`].OutputValue' \
+    --output text)
+
+DB_USERNAME=$(aws cloudformation describe-stacks \
+    --stack-name "${RDS_STACK_ID}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`MasterUsername`].OutputValue' \
+    --output text)
+
+MASTER_SECRET_ARN=$(aws cloudformation describe-stacks \
+    --stack-name "${RDS_STACK_ID}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`MasterUserSecretArn`].OutputValue' \
+    --output text)
+
+# Get RDS secret name directly from CloudFormation output
+# Note: CloudFormation returns full secret name with version suffix (e.g., rds!cluster-xxx-YYYYYY)
+# We need to remove the last 7 characters (-YYYYYY) to get the actual secret name
+RDS_SECRET_NAME_WITH_SUFFIX=$(aws cloudformation describe-stacks \
+    --stack-name "${RDS_STACK_ID}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`MasterUserSecretName`].OutputValue' \
+    --output text)
+
+# Remove the version suffix (last 7 characters: -XXXXXX)
+# AWS Secrets Manager secret names from RDS don't include the version suffix
+RDS_SECRET_NAME="${RDS_SECRET_NAME_WITH_SUFFIX%-??????}"
+
+if [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_USERNAME" ] || [ -z "$RDS_SECRET_NAME" ]; then
+    echo "ERROR: Failed to retrieve RDS connection information from CloudFormation!"
+    echo "DB_HOST: ${DB_HOST}"
+    echo "DB_PORT: ${DB_PORT}"
+    echo "DB_NAME: ${DB_NAME}"
+    echo "DB_USERNAME: ${DB_USERNAME}"
+    echo "RDS_SECRET_NAME_WITH_SUFFIX: ${RDS_SECRET_NAME_WITH_SUFFIX}"
+    echo "RDS_SECRET_NAME: ${RDS_SECRET_NAME}"
+    exit 1
+fi
+
+echo "DB_HOST: ${DB_HOST}"
+echo "DB_PORT: ${DB_PORT}"
+echo "DB_NAME: ${DB_NAME}"
+echo "DB_USERNAME: ${DB_USERNAME}"
+echo "MASTER_SECRET_ARN: ${MASTER_SECRET_ARN}"
+echo "RDS_SECRET_NAME (for External Secrets): ${RDS_SECRET_NAME}"
+
+# Apply External Secrets manifests if exist (for password only)
 if [ -d "./manifests/external-secrets" ]; then
     echo "=========================================="
     echo "Applying External Secrets manifests..."
@@ -74,20 +155,62 @@ if [ -d "./manifests/external-secrets" ]; then
         kubectl apply -f ./manifests/external-secrets/secret-store.yaml
     fi
     
-    # Apply ExternalSecret for RDS if exists
+    # Apply ExternalSecret for RDS if exists - Update with actual secret name
     if [ -f "./manifests/external-secrets/external-secret-rds.yaml" ]; then
         echo "Creating ExternalSecret for RDS credentials..."
-        kubectl apply -f ./manifests/external-secrets/external-secret-rds.yaml -n ${APP_NAMESPACE}
+        # Create a temporary file with the actual secret name from CloudFormation
+        cat ./manifests/external-secrets/external-secret-rds.yaml | \
+            sed "s|key: hlf-sit-rds-master-credentials|key: ${RDS_SECRET_NAME}|g" | \
+            kubectl apply -f - -n ${APP_NAMESPACE}
     fi
     
     # Wait for secrets to be created
     echo "Waiting for secrets to be synced..."
-    sleep 5
+    sleep 10
     
     # Check if secrets are created
     kubectl get externalsecrets -n ${APP_NAMESPACE} || true
+    kubectl get secrets rds-database-secret -n ${APP_NAMESPACE} -o yaml || echo "Secret not yet created"
     
     echo "External Secrets applied successfully"
+fi
+
+# Apply SecurityGroupPolicy for RDS access (Pod-level Security Group - AWS Best Practice)
+if [ -f "./manifests/security-group-policy.yaml" ]; then
+    echo "=========================================="
+    echo "Applying SecurityGroupPolicy for RDS access..."
+    echo "=========================================="
+    
+    # Get EKS Pod Security Group ID from CloudFormation
+    EKS_POD_SG_ID=$(aws cloudformation describe-stacks \
+        --stack-name "${STACK_NAME}" \
+        --region "${AWS_REGION}" \
+        --query 'Stacks[0].Outputs[?OutputKey==`EKSPodSecurityGroupId`].OutputValue' \
+        --output text)
+    
+    # Get EKS Cluster Security Group ID from CloudFormation
+    EKS_CLUSTER_SG_ID=$(aws cloudformation describe-stacks \
+        --stack-name "${STACK_NAME}" \
+        --region "${AWS_REGION}" \
+        --query 'Stacks[0].Outputs[?OutputKey==`EKSClusterSecurityGroupId`].OutputValue' \
+        --output text)
+    
+    if [ -z "$EKS_POD_SG_ID" ] || [ -z "$EKS_CLUSTER_SG_ID" ]; then
+        echo "WARNING: Could not retrieve EKS Security Group IDs from CloudFormation"
+        echo "EKS_POD_SG_ID: ${EKS_POD_SG_ID}"
+        echo "EKS_CLUSTER_SG_ID: ${EKS_CLUSTER_SG_ID}"
+        echo "Skipping SecurityGroupPolicy deployment"
+    else
+        echo "EKS Pod Security Group ID: ${EKS_POD_SG_ID}"
+        echo "EKS Cluster Security Group ID: ${EKS_CLUSTER_SG_ID}"
+        
+        # Replace placeholders with actual security group IDs
+        sed -e "s/sg-placeholder-eks-pod/${EKS_POD_SG_ID}/g" \
+            -e "s/sg-placeholder-eks-cluster/${EKS_CLUSTER_SG_ID}/g" \
+            ./manifests/security-group-policy.yaml | kubectl apply -f -
+        
+        echo "SecurityGroupPolicy applied successfully"
+    fi
 fi
 
 # Deploy application using Helm
@@ -101,12 +224,16 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 
 echo "Using image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
 
-# Deploy the test application
+# Deploy the test application with RDS connection info from CloudFormation
 helm upgrade --install test-app ./charts/test-app \
     --namespace ${APP_NAMESPACE} \
     --set image.repository=${ECR_REPOSITORY} \
     --set image.tag=${IMAGE_TAG} \
     --set environment=${ENVIRONMENT} \
+    --set database.host=${DB_HOST} \
+    --set database.port=${DB_PORT} \
+    --set database.name=${DB_NAME} \
+    --set database.username=${DB_USERNAME} \
     --values ./envs/${ENVIRONMENT}/values.yaml \
     --wait --timeout 5m
 
