@@ -67,8 +67,9 @@ phases:
             SCAN_STATUS="PENDING"
           fi
           echo "Scan status $SCAN_STATUS (elapsed ${ELAPSED}s)"
-          if [ "$SCAN_STATUS" = "COMPLETE" ]; then
+          if [ "$SCAN_STATUS" = "COMPLETE" ] || [ "$SCAN_STATUS" = "ACTIVE" ]; then
             echo "AWS Inspector scan completed successfully"
+            echo "Findings are available"
             break
           elif [ "$SCAN_STATUS" = "FAILED" ]; then
             echo "ERROR AWS Inspector image scan failed"
@@ -94,7 +95,7 @@ phases:
               echo "WARNING Continuing (non-blocking mode)"
               exit 0
             fi
-          elif [ "$SCAN_STATUS" = "IN_PROGRESS" ] || [ "$SCAN_STATUS" = "ACTIVE" ] || [ "$SCAN_STATUS" = "PENDING" ]; then
+          elif [ "$SCAN_STATUS" = "IN_PROGRESS" ] || [ "$SCAN_STATUS" = "PENDING" ]; then
             echo "Scan in progress, waiting..."
           else
             echo "WARNING Unknown scan status $SCAN_STATUS, treating as in progress"
