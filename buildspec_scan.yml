@@ -62,9 +62,8 @@ phases:
             --repository-name "${ECR_REPOSITORY_NAME}" \
             --image-id imageTag="${IMAGE_TAG}" \
             --region "${AWS_DEFAULT_REGION}" \
-            --query 'imageScanStatus.status' \
-            --output text 2>&1 | head -n 1 | tr -d '\n\r')
-          if [ -z "$SCAN_STATUS" ] || [ "$SCAN_STATUS" = "None" ]; then
+            --query 'imageScanStatus.status' 2>&1 | tr -d '"')
+          if [ -z "$SCAN_STATUS" ]; then
             SCAN_STATUS="PENDING"
           fi
           echo "Scan status $SCAN_STATUS (elapsed ${ELAPSED}s)"
