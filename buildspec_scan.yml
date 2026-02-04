@@ -63,25 +63,49 @@ phases:
             --image-id imageTag="${IMAGE_TAG}" \
             --region "${AWS_DEFAULT_REGION}" \
             --query 'imageScanStatus.status' \
-            --output text 2>/dev/null || echo "PENDING")
-          echo "Scan status: $SCAN_STATUS (elapsed: ${ELAPSED}s)"
+            --output text 2>&1 | head -n 1 | tr -d '\n\r')
+          if [ -z "$SCAN_STATUS" ] || [ "$SCAN_STATUS" = "None" ]; then
+            SCAN_STATUS="PENDING"
+          fi
+          echo "Scan status $SCAN_STATUS (elapsed ${ELAPSED}s)"
           if [ "$SCAN_STATUS" = "COMPLETE" ]; then
             echo "AWS Inspector scan completed successfully"
             break
           elif [ "$SCAN_STATUS" = "FAILED" ]; then
-            echo "ERROR AWS Inspector image scan failed!"
+            echo "ERROR AWS Inspector image scan failed"
             if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
               exit 1
             else
-              echo "WARNING: Continuing despite scan failure (non-blocking mode)"
+              echo "WARNING Continuing despite scan failure (non-blocking mode)"
               exit 0
             fi
+          elif [ "$SCAN_STATUS" = "UNSUPPORTED_IMAGE" ]; then
+            echo "WARNING Image type not supported for scanning"
+            if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
+              exit 1
+            else
+              echo "WARNING Continuing (non-blocking mode)"
+              exit 0
+            fi
+          elif [ "$SCAN_STATUS" = "SCAN_ELIGIBILITY_EXPIRED" ] || [ "$SCAN_STATUS" = "FINDINGS_UNAVAILABLE" ]; then
+            echo "WARNING Scan findings not available"
+            if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
+              exit 1
+            else
+              echo "WARNING Continuing (non-blocking mode)"
+              exit 0
+            fi
+          elif [ "$SCAN_STATUS" = "IN_PROGRESS" ] || [ "$SCAN_STATUS" = "ACTIVE" ] || [ "$SCAN_STATUS" = "PENDING" ]; then
+            echo "Scan in progress, waiting..."
+          else
+            echo "WARNING Unknown scan status $SCAN_STATUS, treating as in progress"
           fi
           sleep $WAIT_INTERVAL
           ELAPSED=$((ELAPSED + WAIT_INTERVAL))
         done
         if [ $ELAPSED -ge $MAX_WAIT ]; then
           echo "WARNING Scan did not complete within $MAX_WAIT seconds"
+          echo "Last status was $SCAN_STATUS"
           if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
             echo "ERROR Blocking deployment due to scan timeout in blocking mode"
             exit 1
