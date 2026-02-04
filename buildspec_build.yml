@@ -17,21 +17,15 @@ phases:
   pre_build:
     commands:
       - echo "=========================================="
-      - echo "Stage 1: Docker Build and Push to ECR"
+      - echo "Stage 1 Docker Build and Push to ECR"
       - echo "=========================================="
       - echo "Environment=$ENVIRONMENT"
       - echo "Region=$AWS_DEFAULT_REGION"
-      
-      # Get AWS Account ID
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - export ECR_REPOSITORY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}"
-      
-      # Get commit ID from CodePipeline source artifact
       - export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION}
       - echo "Image Tag (commit SHA)=$IMAGE_TAG"
       - echo "ECR Repository URI=$ECR_REPOSITORY_URI"
-      
-      # Login to ECR
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REPOSITORY_URI}
       - echo "Logged in to ECR successfully"
@@ -50,20 +44,17 @@ phases:
       - docker push ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
       - docker push ${ECR_REPOSITORY_URI}:latest
       - echo "Image pushed to ECR successfully"
-      
       - echo "=========================================="
       - echo "Build Stage Complete"
       - echo "=========================================="
-      - echo "Image URI: ${ECR_REPOSITORY_URI}:${IMAGE_TAG}"
-      - echo "Latest URI: ${ECR_REPOSITORY_URI}:latest"
-      - echo "ECR Console: https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}"
+      - echo "Image URI ${ECR_REPOSITORY_URI}:${IMAGE_TAG}"
+      - echo "Latest URI ${ECR_REPOSITORY_URI}:latest"
+      - echo "ECR Console https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}"
       - echo ""
-      - echo "Next Stage: AWS Inspector Vulnerability Scan"
-      - echo "Scan Type: OS packages + Programming language packages"
+      - echo "Next Stage AWS Inspector Vulnerability Scan"
+      - echo "Scan Type OS packages + Programming language packages"
       - echo "Inspector automatically scans on image push to ECR"
       - echo "=========================================="
-      
-      # Create build output file for next stage
       - echo "{\"imageTag\":\"${IMAGE_TAG}\",\"imageUri\":\"${ECR_REPOSITORY_URI}:${IMAGE_TAG}\",\"repository\":\"${ECR_REPOSITORY_NAME}\"}" > build-output.json
       - cat build-output.json
 
