@@ -61,7 +61,10 @@ phases:
 artifacts:
   files:
     - build-output.json
+    - buildspec_scan.yml
+    - buildspec_module.yml
     - scripts/**/*
+    - script/**/*
     - manifests/**/*
     - charts/**/*
   name: build-artifacts
