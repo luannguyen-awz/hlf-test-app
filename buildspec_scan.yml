@@ -26,16 +26,12 @@ phases:
   pre_build:
     commands:
       - echo "=========================================="
-      - echo "Stage 2: AWS Inspector Vulnerability Scan Validation"
+      - echo "Stage 2 AWS Inspector Vulnerability Scan Validation"
       - echo "=========================================="
       - echo "Environment=$ENVIRONMENT"
       - echo "ECR Repository=$ECR_REPOSITORY_NAME"
-      
-      # Get AWS Account ID
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - export ECR_REPOSITORY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}"
-      
-      # Get IMAGE_TAG from previous build stage artifact or CodeBuild variable
       - |
         if [ -f build-output.json ]; then
           export IMAGE_TAG=$(cat build-output.json | jq -r '.imageTag')
@@ -44,28 +40,23 @@ phases:
           export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
           echo "Image Tag from CodeBuild: $IMAGE_TAG"
         fi
-      
       - echo "Image Tag=$IMAGE_TAG"
       - echo "ECR Repository URI=$ECR_REPOSITORY_URI"
       - echo ""
       - echo "Policy Configuration:"
-      - echo "  Block on Critical: $BLOCK_ON_CRITICAL"
-      - echo "  Enable Notification: $ENABLE_NOTIFICATION"
-      - echo "  Allow Override: $ALLOW_OVERRIDE"
+      - echo "  Block on Critical $BLOCK_ON_CRITICAL"
+      - echo "  Enable Notification $ENABLE_NOTIFICATION"
+      - echo "  Allow Override $ALLOW_OVERRIDE"
       - echo "=========================================="
-      
   build:
     commands:
       - echo "Waiting for AWS Inspector vulnerability scan to complete..."
       - echo "Note: ECR with AWS Inspector automatically scans images on push"
       - echo "Inspector scans for OS and programming language package vulnerabilities"
-      
-      # Wait for scan to complete (max 10 minutes for Inspector)
       - |
-        MAX_WAIT=600  # 10 minutes (Inspector scans can take longer)
+        MAX_WAIT=600
         WAIT_INTERVAL=15
         ELAPSED=0
-        
         while [ $ELAPSED -lt $MAX_WAIT ]; do
           SCAN_STATUS=$(aws ecr describe-image-scan-findings \
             --repository-name "${ECR_REPOSITORY_NAME}" \
@@ -73,9 +64,7 @@ phases:
             --region "${AWS_DEFAULT_REGION}" \
             --query 'imageScanStatus.status' \
             --output text 2>/dev/null || echo "PENDING")
-          
           echo "Scan status: $SCAN_STATUS (elapsed: ${ELAPSED}s)"
-          
           if [ "$SCAN_STATUS" = "COMPLETE" ]; then
             echo "AWS Inspector scan completed successfully"
             break
@@ -88,11 +77,9 @@ phases:
               exit 0
             fi
           fi
-          
           sleep $WAIT_INTERVAL
           ELAPSED=$((ELAPSED + WAIT_INTERVAL))
         done
-        
         if [ $ELAPSED -ge $MAX_WAIT ]; then
           echo "WARNING: Scan did not complete within $MAX_WAIT seconds"
           if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
@@ -103,8 +90,6 @@ phases:
             exit 0
           fi
         fi
-      
-      # Get AWS Inspector scan findings
       - echo "Retrieving AWS Inspector scan findings..."
       - |
         SCAN_FINDINGS=$(aws ecr describe-image-scan-findings \
@@ -123,10 +108,7 @@ phases:
             exit 0
           fi
         fi
-        
-        echo "Successfully retrieved scan findings from AWS Inspector"git a
-        
-        # Parse findings count
+        echo "Successfully retrieved scan findings from AWS Inspector"
         CRITICAL_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0')
         HIGH_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0')
         MEDIUM_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.MEDIUM // 0')
@@ -148,19 +130,13 @@ phases:
         echo "Blocking Mode: $BLOCK_ON_CRITICAL"
         echo "Override:      $ALLOW_OVERRIDE"
         echo "=========================================="
-        
-        # Export for notification
         export CRITICAL_COUNT
         export HIGH_COUNT
         export MEDIUM_COUNT
         export LOW_COUNT
         export INFORMATIONAL_COUNT
         export UNDEFINED_COUNT
-        
-        # Save findings to file for artifact
         echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json
-        
-        # Create summary report
         cat > scan-summary.txt <<EOF
         ========================================
         AWS Inspector Vulnerability Scan Report
@@ -198,11 +174,9 @@ phases:
         
   post_build:
     commands:
-      # Send notification if enabled
       - |
         if [ "$ENABLE_NOTIFICATION" = "true" ] && [ -n "$SNS_TOPIC_ARN" ]; then
           echo "Sending scan results notification..."
-          
           SEVERITY_LABEL="INFO"
           if [ "$CRITICAL_COUNT" -gt 0 ]; then
             SEVERITY_LABEL="CRITICAL"
@@ -211,7 +185,6 @@ phases:
           elif [ "$MEDIUM_COUNT" -gt 0 ]; then
             SEVERITY_LABEL="MEDIUM"
           fi
-          
           NOTIFICATION_MESSAGE=$(cat <<EOF
         AWS Inspector Vulnerability Scan Alert - $SEVERITY_LABEL
 
@@ -233,28 +206,24 @@ phases:
         - Allow Override: $ALLOW_OVERRIDE
 
         Action Required:
-        $(if [ "$CRITICAL_COUNT" -gt 0 ]; then echo "⚠️  CRITICAL: Application team must fix these vulnerabilities before PROD deployment"; fi)
-        $(if [ "$HIGH_COUNT" -gt 0 ]; then echo "⚠️  HIGH: Application team should review and remediate these vulnerabilities"; fi)
-        $(if [ "$MEDIUM_COUNT" -gt 0 ]; then echo "ℹ️  MEDIUM: Review recommended for $MEDIUM_COUNT vulnerabilities"; fi)
+        $(if [ "$CRITICAL_COUNT" -gt 0 ]; then echo "WARNING CRITICAL Application team must fix these vulnerabilities before PROD deployment"; fi)
+        $(if [ "$HIGH_COUNT" -gt 0 ]; then echo "WARNING HIGH Application team should review and remediate these vulnerabilities"; fi)
+        $(if [ "$MEDIUM_COUNT" -gt 0 ]; then echo "INFO MEDIUM Review recommended for $MEDIUM_COUNT vulnerabilities"; fi)
 
         View Details:
         ECR Console: https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}
         Inspector Console: https://console.aws.amazon.com/inspector/v2/home?region=${AWS_DEFAULT_REGION}#/findings
         EOF
           )
-          
           aws sns publish \
             --topic-arn "$SNS_TOPIC_ARN" \
             --subject "AWS Inspector Scan Alert [$SEVERITY_LABEL] - $ECR_REPOSITORY_NAME:$IMAGE_TAG" \
             --message "$NOTIFICATION_MESSAGE" \
             --region "$AWS_DEFAULT_REGION" || echo "WARNING: Failed to send SNS notification"
-          
           echo "Notification sent to application team via SNS"
         else
           echo "Notification disabled for this environment"
         fi
-      
-      # Check if deployment should be blocked based on CRITICAL vulnerabilities
       - |
         if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
           if [ "$CRITICAL_COUNT" -gt "$MAX_CRITICAL_FINDINGS" ]; then
@@ -280,13 +249,10 @@ phases:
             echo "ECR: https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}"
             echo "Inspector: https://console.aws.amazon.com/inspector/v2/home?region=${AWS_DEFAULT_REGION}#/findings"
             echo "=========================================="
-            
-            # Check for emergency override
             if [ "$ALLOW_OVERRIDE" = "true" ] && [ "${CODEBUILD_BUILD_OVERRIDE:-false}" = "true" ]; then
               echo "WARNING: EMERGENCY OVERRIDE ACTIVATED"
               echo "WARNING: Deployment proceeding despite CRITICAL vulnerabilities"
               echo "WARNING: This override has been logged and security team notified"
-              # In production, you would log this to CloudWatch/Security Hub
             else
               exit 1
             fi
@@ -310,7 +276,6 @@ phases:
           fi
           echo "=========================================="
         fi
-      
       - echo "=========================================="
       - echo "Scan validation passed"
       - echo "=========================================="
