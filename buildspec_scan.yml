@@ -51,7 +51,7 @@ phases:
   build:
     commands:
       - echo "Waiting for AWS Inspector vulnerability scan to complete..."
-      - echo "Note: ECR with AWS Inspector automatically scans images on push"
+      - echo "Note ECR with AWS Inspector automatically scans images on push"
       - echo "Inspector scans for OS and programming language package vulnerabilities"
       - |
         MAX_WAIT=600
@@ -69,7 +69,7 @@ phases:
             echo "AWS Inspector scan completed successfully"
             break
           elif [ "$SCAN_STATUS" = "FAILED" ]; then
-            echo "ERROR: AWS Inspector image scan failed!"
+            echo "ERROR AWS Inspector image scan failed!"
             if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
               exit 1
             else
@@ -81,12 +81,12 @@ phases:
           ELAPSED=$((ELAPSED + WAIT_INTERVAL))
         done
         if [ $ELAPSED -ge $MAX_WAIT ]; then
-          echo "WARNING: Scan did not complete within $MAX_WAIT seconds"
+          echo "WARNING Scan did not complete within $MAX_WAIT seconds"
           if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
-            echo "ERROR: Blocking deployment due to scan timeout in blocking mode"
+            echo "ERROR Blocking deployment due to scan timeout in blocking mode"
             exit 1
           else
-            echo "WARNING: Continuing despite scan timeout (non-blocking mode)"
+            echo "WARNING Continuing despite scan timeout (non-blocking mode)"
             exit 0
           fi
         fi
@@ -98,13 +98,13 @@ phases:
           --region "${AWS_DEFAULT_REGION}" 2>&1)
         
         if [ $? -ne 0 ]; then
-          echo "WARNING: Could not retrieve AWS Inspector scan findings"
+          echo "WARNING Could not retrieve AWS Inspector scan findings"
           echo "$SCAN_FINDINGS"
           if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
-            echo "ERROR: Blocking deployment due to scan retrieval failure"
+            echo "ERROR Blocking deployment due to scan retrieval failure"
             exit 1
           else
-            echo "WARNING: Continuing despite scan retrieval failure (non-blocking mode)"
+            echo "WARNING Continuing despite scan retrieval failure (non-blocking mode)"
             exit 0
           fi
         fi
@@ -119,16 +119,16 @@ phases:
         echo "=========================================="
         echo "AWS Inspector Vulnerability Scan Results"
         echo "=========================================="
-        echo "CRITICAL:      $CRITICAL_COUNT"
-        echo "HIGH:          $HIGH_COUNT"
-        echo "MEDIUM:        $MEDIUM_COUNT"
-        echo "LOW:           $LOW_COUNT"
-        echo "INFORMATIONAL: $INFORMATIONAL_COUNT"
-        echo "UNDEFINED:     $UNDEFINED_COUNT"
+        echo "CRITICAL      $CRITICAL_COUNT"
+        echo "HIGH          $HIGH_COUNT"
+        echo "MEDIUM        $MEDIUM_COUNT"
+        echo "LOW           $LOW_COUNT"
+        echo "INFORMATIONAL $INFORMATIONAL_COUNT"
+        echo "UNDEFINED     $UNDEFINED_COUNT"
         echo "=========================================="
-        echo "Environment:   $ENVIRONMENT"
-        echo "Blocking Mode: $BLOCK_ON_CRITICAL"
-        echo "Override:      $ALLOW_OVERRIDE"
+        echo "Environment   $ENVIRONMENT"
+        echo "Blocking Mode $BLOCK_ON_CRITICAL"
+        echo "Override      $ALLOW_OVERRIDE"
         echo "=========================================="
         export CRITICAL_COUNT
         export HIGH_COUNT
@@ -217,9 +217,9 @@ phases:
           )
           aws sns publish \
             --topic-arn "$SNS_TOPIC_ARN" \
-            --subject "AWS Inspector Scan Alert [$SEVERITY_LABEL] - $ECR_REPOSITORY_NAME:$IMAGE_TAG" \
+            --subject "AWS Inspector Scan Alert [$SEVERITY_LABEL] - $ECR_REPOSITORY_NAME $IMAGE_TAG" \
             --message "$NOTIFICATION_MESSAGE" \
-            --region "$AWS_DEFAULT_REGION" || echo "WARNING: Failed to send SNS notification"
+            --region "$AWS_DEFAULT_REGION" || echo "WARNING Failed to send SNS notification"
           echo "Notification sent to application team via SNS"
         else
           echo "Notification disabled for this environment"
@@ -230,29 +230,29 @@ phases:
             echo "=========================================="
             echo "DEPLOYMENT BLOCKED - CRITICAL VULNERABILITIES DETECTED"
             echo "=========================================="
-            echo "Environment: $ENVIRONMENT"
-            echo "Found: $CRITICAL_COUNT CRITICAL vulnerabilities"
-            echo "Threshold: $MAX_CRITICAL_FINDINGS CRITICAL vulnerabilities allowed"
+            echo "Environment $ENVIRONMENT"
+            echo "Found $CRITICAL_COUNT CRITICAL vulnerabilities"
+            echo "Threshold $MAX_CRITICAL_FINDINGS CRITICAL vulnerabilities allowed"
             echo ""
-            echo "Action Required:"
+            echo "Action Required"
             echo "- Application team must fix CRITICAL vulnerabilities"
             echo "- CVE remediation is required before deployment"
             echo ""
             if [ "$ALLOW_OVERRIDE" = "true" ]; then
-              echo "Emergency Override:"
+              echo "Emergency Override"
               echo "- Set CODEBUILD_BUILD_OVERRIDE=true in CodeBuild console"
               echo "- Document reason for override in deployment log"
               echo "- Security team will be notified of override"
             fi
             echo ""
-            echo "View Vulnerabilities:"
-            echo "ECR: https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}"
-            echo "Inspector: https://console.aws.amazon.com/inspector/v2/home?region=${AWS_DEFAULT_REGION}#/findings"
+            echo "View Vulnerabilities"
+            echo "ECR https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}"
+            echo "Inspector https://console.aws.amazon.com/inspector/v2/home?region=${AWS_DEFAULT_REGION}#/findings"
             echo "=========================================="
             if [ "$ALLOW_OVERRIDE" = "true" ] && [ "${CODEBUILD_BUILD_OVERRIDE:-false}" = "true" ]; then
-              echo "WARNING: EMERGENCY OVERRIDE ACTIVATED"
-              echo "WARNING: Deployment proceeding despite CRITICAL vulnerabilities"
-              echo "WARNING: This override has been logged and security team notified"
+              echo "WARNING EMERGENCY OVERRIDE ACTIVATED"
+              echo "WARNING Deployment proceeding despite CRITICAL vulnerabilities"
+              echo "WARNING This override has been logged and security team notified"
             else
               exit 1
             fi
@@ -265,12 +265,12 @@ phases:
           echo "=========================================="
           if [ "$CRITICAL_COUNT" -gt 0 ]; then
             echo "Found $CRITICAL_COUNT CRITICAL vulnerabilities"
-            echo "WARNING: Deployment NOT blocked in $ENVIRONMENT (warn only)"
-            echo "WARNING: Application team should fix these vulnerabilities before PROD"
+            echo "WARNING Deployment NOT blocked in $ENVIRONMENT (warn only)"
+            echo "WARNING Application team should fix these vulnerabilities before PROD"
             echo ""
-            echo "View Vulnerabilities:"
-            echo "ECR: https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}"
-            echo "Inspector: https://console.aws.amazon.com/inspector/v2/home?region=${AWS_DEFAULT_REGION}#/findings"
+            echo "View Vulnerabilities"
+            echo "ECR https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}"
+            echo "Inspector https://console.aws.amazon.com/inspector/v2/home?region=${AWS_DEFAULT_REGION}#/findings"
           else
             echo "No CRITICAL vulnerabilities found"
           fi
