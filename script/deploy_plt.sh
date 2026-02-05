@@ -57,7 +57,7 @@ echo "EFS File System ID: ${EFS_FILE_SYSTEM_ID}"
 
 # Deploy EFS StorageClass
 echo "=========================================="
-echo "Deploying EFS Storage (Static Provisioning for Fargate)..."
+echo "Deploying EFS Storage (Static PV for Fargate)..."
 echo "=========================================="
 
 if [ -f "./manifests/storage/efs-pv-static.yaml" ]; then
@@ -65,15 +65,15 @@ if [ -f "./manifests/storage/efs-pv-static.yaml" ]; then
     TEMP_FILE=$(mktemp)
     sed "s/\${EFS_FILE_SYSTEM_ID}/${EFS_FILE_SYSTEM_ID}/g" ./manifests/storage/efs-pv-static.yaml > "$TEMP_FILE"
     
-    echo "Creating EFS PersistentVolume and PersistentVolumeClaim..."
+    echo "Creating EFS PersistentVolume (static)..."
     kubectl apply -f "$TEMP_FILE"
     
     # Clean up temp file
     rm -f "$TEMP_FILE"
     
-    echo "EFS PV and PVC created successfully"
+    echo "EFS PV created successfully"
     kubectl get pv | grep efs || true
-    kubectl get pvc -n default | grep efs || true
+    echo "Note: Applications will create their own PVCs to bind to this PV"
 else
     echo "WARNING: EFS PV manifest not found"
 fi

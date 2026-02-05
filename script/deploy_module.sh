@@ -143,74 +143,30 @@ echo "DB_USERNAME: ${DB_USERNAME}"
 echo "MASTER_SECRET_ARN: ${MASTER_SECRET_ARN}"
 echo "RDS_SECRET_NAME (for External Secrets): ${RDS_SECRET_NAME}"
 
-# Apply External Secrets manifests if exist (for password only)
-if [ -d "./manifests/external-secrets" ]; then
-    echo "=========================================="
-    echo "Applying External Secrets manifests..."
-    echo "=========================================="
-    
-    # Apply SecretStore if exists
-    if [ -f "./manifests/external-secrets/secret-store.yaml" ]; then
-        echo "Creating SecretStore resources..."
-        kubectl apply -f ./manifests/external-secrets/secret-store.yaml
-    fi
-    
-    # Apply ExternalSecret for RDS if exists - Update with actual secret name
-    if [ -f "./manifests/external-secrets/external-secret-rds.yaml" ]; then
-        echo "Creating ExternalSecret for RDS credentials..."
-        # Create a temporary file with the actual secret name from CloudFormation
-        cat ./manifests/external-secrets/external-secret-rds.yaml | \
-            sed "s|key: hlf-sit-rds-master-credentials|key: ${RDS_SECRET_NAME}|g" | \
-            kubectl apply -f - -n ${APP_NAMESPACE}
-    fi
-    
-    # Wait for secrets to be created
-    echo "Waiting for secrets to be synced..."
-    sleep 10
-    
-    # Check if secrets are created
-    kubectl get externalsecrets -n ${APP_NAMESPACE} || true
-    kubectl get secrets rds-database-secret -n ${APP_NAMESPACE} -o yaml || echo "Secret not yet created"
-    
-    echo "External Secrets applied successfully"
-fi
+# Get EKS Security Group IDs from CloudFormation (for SecurityGroupPolicy in Helm)
+echo "=========================================="
+echo "Getting EKS Security Group IDs..."
+echo "=========================================="
 
-# Apply SecurityGroupPolicy for RDS access (Pod-level Security Group - AWS Best Practice)
-if [ -f "./manifests/security-group-policy.yaml" ]; then
-    echo "=========================================="
-    echo "Applying SecurityGroupPolicy for RDS access..."
-    echo "=========================================="
-    
-    # Get EKS Pod Security Group ID from CloudFormation
-    EKS_POD_SG_ID=$(aws cloudformation describe-stacks \
-        --stack-name "${STACK_NAME}" \
-        --region "${AWS_REGION}" \
-        --query 'Stacks[0].Outputs[?OutputKey==`EKSPodSecurityGroupId`].OutputValue' \
-        --output text)
-    
-    # Get EKS Cluster Security Group ID from CloudFormation
-    EKS_CLUSTER_SG_ID=$(aws cloudformation describe-stacks \
-        --stack-name "${STACK_NAME}" \
-        --region "${AWS_REGION}" \
-        --query 'Stacks[0].Outputs[?OutputKey==`EKSClusterSecurityGroupId`].OutputValue' \
-        --output text)
-    
-    if [ -z "$EKS_POD_SG_ID" ] || [ -z "$EKS_CLUSTER_SG_ID" ]; then
-        echo "WARNING: Could not retrieve EKS Security Group IDs from CloudFormation"
-        echo "EKS_POD_SG_ID: ${EKS_POD_SG_ID}"
-        echo "EKS_CLUSTER_SG_ID: ${EKS_CLUSTER_SG_ID}"
-        echo "Skipping SecurityGroupPolicy deployment"
-    else
-        echo "EKS Pod Security Group ID: ${EKS_POD_SG_ID}"
-        echo "EKS Cluster Security Group ID: ${EKS_CLUSTER_SG_ID}"
-        
-        # Replace placeholders with actual security group IDs
-        sed -e "s/sg-placeholder-eks-pod/${EKS_POD_SG_ID}/g" \
-            -e "s/sg-placeholder-eks-cluster/${EKS_CLUSTER_SG_ID}/g" \
-            ./manifests/security-group-policy.yaml | kubectl apply -f -
-        
-        echo "SecurityGroupPolicy applied successfully"
-    fi
+EKS_POD_SG_ID=$(aws cloudformation describe-stacks \
+    --stack-name "${STACK_NAME}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`EKSPodSecurityGroupId`].OutputValue' \
+    --output text)
+
+EKS_CLUSTER_SG_ID=$(aws cloudformation describe-stacks \
+    --stack-name "${STACK_NAME}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`EKSClusterSecurityGroupId`].OutputValue' \
+    --output text)
+
+if [ -z "$EKS_POD_SG_ID" ] || [ -z "$EKS_CLUSTER_SG_ID" ]; then
+    echo "WARNING: Could not retrieve EKS Security Group IDs from CloudFormation"
+    echo "EKS_POD_SG_ID: ${EKS_POD_SG_ID}"
+    echo "EKS_CLUSTER_SG_ID: ${EKS_CLUSTER_SG_ID}"
+else
+    echo "EKS Pod Security Group ID: ${EKS_POD_SG_ID}"
+    echo "EKS Cluster Security Group ID: ${EKS_CLUSTER_SG_ID}"
 fi
 
 # Deploy application using Helm
@@ -225,6 +181,7 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 echo "Using image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
 
 # Deploy the test application with RDS connection info from CloudFormation
+# Note: SecurityGroupPolicy and ExternalSecret are now managed as Helm templates
 helm upgrade --install test-app ./charts/test-app \
     --namespace ${APP_NAMESPACE} \
     --set image.repository=${ECR_REPOSITORY} \
@@ -234,10 +191,17 @@ helm upgrade --install test-app ./charts/test-app \
     --set database.port=${DB_PORT} \
     --set database.name=${DB_NAME} \
     --set database.username=${DB_USERNAME} \
+    --set securityGroups.eksClusterSecurityGroupId=${EKS_CLUSTER_SG_ID} \
+    --set securityGroups.eksPodSecurityGroupId=${EKS_POD_SG_ID} \
+    --set externalSecrets.rdsSecretKey=${RDS_SECRET_NAME} \
     --values ./envs/${ENVIRONMENT}/values.yaml \
     --wait --timeout 5m
 
 echo "Application deployed successfully"
+
+# Wait for External Secrets to sync
+echo "Waiting for External Secrets to sync..."
+sleep 10
 
 # Show deployment status
 echo "=========================================="
@@ -246,8 +210,9 @@ echo "=========================================="
 kubectl get deployments -n ${APP_NAMESPACE}
 kubectl get pods -n ${APP_NAMESPACE}
 kubectl get services -n ${APP_NAMESPACE}
+kubectl get securitygrouppolicies -n ${APP_NAMESPACE} || true
 kubectl get externalsecrets -n ${APP_NAMESPACE} || true
-kubectl get secrets -n ${APP_NAMESPACE} | grep -E "rds-database-secret|NAME" || true
+kubectl get secrets -n ${APP_NAMESPACE} | grep "database-secret" || true
 
 echo "=========================================="
 echo "Application Module Deployment Completed"

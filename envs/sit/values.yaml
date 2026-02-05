@@ -46,6 +46,6 @@ persistence:
   enabled: true
   size: 10Gi
   mountPath: /app/data
-  storageClass: ""
-  provisioningMode: static  # Fargate only supports static provisioning
-  existingClaim: efs-pvc
+  storageClass: ""  # Empty storageClass for static PV binding (Fargate)
+  existingClaim: ""  # App creates its own PVC to bind to static PV
+

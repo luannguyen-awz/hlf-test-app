@@ -1,0 +1,21 @@
+apiVersion: vpcresources.k8s.aws/v1beta1
+kind: SecurityGroupPolicy
+metadata:
+  name: {{ include "test-app.fullname" . }}-rds-access
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "test-app.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "test-app.selectorLabels" . | nindent 6 }}
+  securityGroups:
+    groupIds:
+      # AWS Requirement: Include cluster security group for control plane communication (Fargate)
+      {{- if .Values.securityGroups.eksClusterSecurityGroupId }}
+      - {{ .Values.securityGroups.eksClusterSecurityGroupId }}
+      {{- end }}
+      # Pod-specific security group for RDS access
+      {{- if .Values.securityGroups.eksPodSecurityGroupId }}
+      - {{ .Values.securityGroups.eksPodSecurityGroupId }}
+      {{- end }}

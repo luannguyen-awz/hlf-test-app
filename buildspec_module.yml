@@ -74,9 +74,8 @@ phases:
           
           # Execute deployment script
           # This script will:
-          # 1. Apply External Secrets manifests (SecretStore & ExternalSecret)
-          # 2. Wait for secrets to be synced from AWS Secrets Manager
-          # 3. Deploy the application via Helm
+          # 1. Get RDS and EKS configuration from CloudFormation
+          # 2. Deploy the application via Helm (includes External Secrets & SecurityGroupPolicy as templates)
           ./script/deploy_module.sh
         fi
       - echo "Module deployment step finished!!!"
@@ -92,7 +91,10 @@ phases:
         if [ "$MODULE_ENABLE" != "false" ]; then
           echo "Checking External Secrets sync status..."
           kubectl get externalsecrets -n ${APP_NAMESPACE} || echo "No External Secrets found"
-          kubectl get secrets -n ${APP_NAMESPACE} | grep -E "rds-database-secret|NAME" || echo "RDS secret not found"
+          kubectl get secrets -n ${APP_NAMESPACE} | grep "database-secret" || echo "Database secret not found"
+          
+          echo "Checking SecurityGroupPolicy status..."
+          kubectl get securitygrouppolicies -n ${APP_NAMESPACE} || echo "No SecurityGroupPolicy found"
           
           echo "Checking application pods status..."
           kubectl get pods -n ${APP_NAMESPACE} -l app.kubernetes.io/name=test-app

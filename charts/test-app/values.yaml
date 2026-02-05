@@ -69,6 +69,17 @@ affinity: {}
 # Environment-specific settings
 environment: sit
 
+# Security Groups (for pod network access)
+securityGroups:
+  eksClusterSecurityGroupId: ""  # Will be set from environment
+  eksPodSecurityGroupId: ""      # Will be set from environment
+
+# External Secrets configuration
+externalSecrets:
+  enabled: true
+  secretStoreName: aws-secrets-manager-global
+  rdsSecretKey: ""  # Will be set from environment (e.g., rds/hlf-rds-sit-aurora-cluster/...)
+
 # Database configuration (from RDS stack)
 database:
   enabled: true
@@ -89,7 +100,7 @@ persistence:
   size: 10Gi
   mountPath: /app/data
   storageClass: efs-sc
-  # Provisioning mode: static (for Fargate) or dynamic (requires EC2 nodes)
-  provisioningMode: static
-  # PVC name for static provisioning (should match the PVC in manifests/storage/efs-pv-static.yaml)
-  existingClaim: efs-pvc
+  # For static PV binding (Fargate): set storageClassName: "" in environment values
+  # For dynamic provisioning (EC2): use storageClass: efs-sc
+  # Set existingClaim only if you want to use an externally managed PVC
+  existingClaim: ""
