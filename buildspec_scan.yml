@@ -121,14 +121,11 @@ phases:
         fi
       - echo "Retrieving AWS Inspector scan findings..."
       - |
+        echo "Fetching scan results from ECR..."
         set +e
-        SCAN_FINDINGS=$(aws ecr describe-image-scan-findings \
-          --repository-name "${ECR_REPOSITORY_NAME}" \
-          --image-id imageTag="${IMAGE_TAG}" \
-          --region "${AWS_DEFAULT_REGION}" 2>&1)
+        SCAN_FINDINGS=$(aws ecr describe-image-scan-findings --repository-name "${ECR_REPOSITORY_NAME}" --image-id imageTag="${IMAGE_TAG}" --region "${AWS_DEFAULT_REGION}" 2>&1)
         SCAN_EXIT_CODE=$?
         set -e
-        
         if [ $SCAN_EXIT_CODE -ne 0 ]; then
           echo "WARNING: Could not retrieve AWS Inspector scan findings"
           echo "$SCAN_FINDINGS"
