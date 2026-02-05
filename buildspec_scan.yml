@@ -37,8 +37,10 @@ phases:
           export IMAGE_TAG=$(cat build-output.json | jq -r '.imageTag')
           echo "Image Tag from build artifact: $IMAGE_TAG"
         else
-          export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
-          echo "Image Tag from CodeBuild: $IMAGE_TAG"
+          # Fallback: Extract short hash from commit
+          export COMMIT_HASH=${CODEBUILD_RESOLVED_SOURCE_VERSION}
+          export IMAGE_TAG=$(echo ${COMMIT_HASH} | cut -c1-7)
+          echo "Image Tag from CodeBuild (short hash): $IMAGE_TAG"
         fi
       - echo "Image Tag=$IMAGE_TAG"
       - echo "ECR Repository URI=$ECR_REPOSITORY_URI"
