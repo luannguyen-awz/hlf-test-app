@@ -120,12 +120,12 @@ phases:
           fi
         fi
       - echo "Retrieving AWS Inspector scan findings..."
+      - echo "Fetching scan results from ECR..."
+      - set +e
+      - SCAN_FINDINGS=$(aws ecr describe-image-scan-findings --repository-name "${ECR_REPOSITORY_NAME}" --image-id imageTag="${IMAGE_TAG}" --region "${AWS_DEFAULT_REGION}" 2>&1)
+      - SCAN_EXIT_CODE=$?
+      - set -e
       - |
-        echo "Fetching scan results from ECR..."
-        set +e
-        SCAN_FINDINGS=$(aws ecr describe-image-scan-findings --repository-name "${ECR_REPOSITORY_NAME}" --image-id imageTag="${IMAGE_TAG}" --region "${AWS_DEFAULT_REGION}" 2>&1)
-        SCAN_EXIT_CODE=$?
-        set -e
         if [ $SCAN_EXIT_CODE -ne 0 ]; then
           echo "WARNING: Could not retrieve AWS Inspector scan findings"
           echo "$SCAN_FINDINGS"
@@ -137,39 +137,35 @@ phases:
             exit 0
           fi
         fi
-        
-        echo "Successfully retrieved scan findings from AWS Inspector"
-        
+      - echo "Successfully retrieved scan findings from AWS Inspector"
+      - |
         CRITICAL_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0')
         HIGH_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0')
         MEDIUM_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.MEDIUM // 0')
         LOW_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.LOW // 0')
         INFORMATIONAL_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.INFORMATIONAL // 0')
         UNDEFINED_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.UNDEFINED // 0')
-        
-        echo "=========================================="
-        echo "AWS Inspector Vulnerability Scan Results"
-        echo "=========================================="
-        echo "CRITICAL      $CRITICAL_COUNT"
-        echo "HIGH          $HIGH_COUNT"
-        echo "MEDIUM        $MEDIUM_COUNT"
-        echo "LOW           $LOW_COUNT"
-        echo "INFORMATIONAL $INFORMATIONAL_COUNT"
-        echo "UNDEFINED     $UNDEFINED_COUNT"
-        echo "=========================================="
-        echo "Environment   $ENVIRONMENT"
-        echo "Blocking Mode $BLOCK_ON_CRITICAL"
-        echo "Override      $ALLOW_OVERRIDE"
-        echo "=========================================="
-        
         export CRITICAL_COUNT
         export HIGH_COUNT
         export MEDIUM_COUNT
         export LOW_COUNT
         export INFORMATIONAL_COUNT
         export UNDEFINED_COUNT
-        
-        echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json
+      - echo "=========================================="
+      - echo "AWS Inspector Vulnerability Scan Results"
+      - echo "=========================================="
+      - echo "CRITICAL      $CRITICAL_COUNT"
+      - echo "HIGH          $HIGH_COUNT"
+      - echo "MEDIUM        $MEDIUM_COUNT"
+      - echo "LOW           $LOW_COUNT"
+      - echo "INFORMATIONAL $INFORMATIONAL_COUNT"
+      - echo "UNDEFINED     $UNDEFINED_COUNT"
+      - echo "=========================================="
+      - echo "Environment   $ENVIRONMENT"
+      - echo "Blocking Mode $BLOCK_ON_CRITICAL"
+      - echo "Override      $ALLOW_OVERRIDE"
+      - echo "=========================================="
+      - echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json
   post_build:
     commands:
       - |
