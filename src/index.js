@@ -120,7 +120,7 @@ app.get('/db/test', async (req, res) => {
   }
 
   try {
-    const [rows] = await pool.query('SELECT NOW() as current_time, VERSION() as version');
+    const [rows] = await pool.query('SELECT NOW() as `current_time`, VERSION() as `version`');
     res.json({
       status: 'connected',
       data: rows[0]
