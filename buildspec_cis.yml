@@ -17,9 +17,12 @@ phases:
       - export ECR_REPOSITORY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}"
       - echo "ECR Repository URI=$ECR_REPOSITORY_URI"
       
-      # Set IMAGE_TAG from CodeBuild commit ID or use latest
-      - export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
-      - echo "Image Tag=$IMAGE_TAG"
+      # Set IMAGE_TAG from CodeBuild commit ID (use short hash to match build stage)
+      - export COMMIT_HASH=${CODEBUILD_RESOLVED_SOURCE_VERSION}
+      - export SHORT_HASH=$(echo ${COMMIT_HASH} | cut -c1-7)
+      - export IMAGE_TAG=${SHORT_HASH:-latest}
+      - echo "Commit Hash (full)=$COMMIT_HASH"
+      - echo "Image Tag (short-hash)=$IMAGE_TAG"
 
   build:
     commands:
