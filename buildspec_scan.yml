@@ -56,6 +56,7 @@ phases:
       - echo "Note ECR with AWS Inspector automatically scans images on push"
       - echo "Inspector scans for OS and programming language package vulnerabilities"
       - |
+        set +e  # Allow errors in the wait loop
         MAX_WAIT=600
         WAIT_INTERVAL=15
         ELAPSED=0
@@ -68,73 +69,80 @@ phases:
           if [ -z "$SCAN_STATUS" ]; then
             SCAN_STATUS="PENDING"
           fi
-          echo "Scan status $SCAN_STATUS (elapsed ${ELAPSED}s)"
+          echo "Scan status: $SCAN_STATUS (elapsed: ${ELAPSED}s)"
           if [ "$SCAN_STATUS" = "COMPLETE" ] || [ "$SCAN_STATUS" = "ACTIVE" ]; then
-            echo "AWS Inspector scan completed successfully"
+            echo "✓ AWS Inspector scan completed successfully"
             echo "Findings are available"
             break
           elif [ "$SCAN_STATUS" = "FAILED" ]; then
-            echo "ERROR AWS Inspector image scan failed"
+            echo "ERROR: AWS Inspector image scan failed"
             if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
               exit 1
             else
-              echo "WARNING Continuing despite scan failure (non-blocking mode)"
+              echo "WARNING: Continuing despite scan failure (non-blocking mode)"
               exit 0
             fi
           elif [ "$SCAN_STATUS" = "UNSUPPORTED_IMAGE" ]; then
-            echo "WARNING Image type not supported for scanning"
+            echo "WARNING: Image type not supported for scanning"
             if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
               exit 1
             else
-              echo "WARNING Continuing (non-blocking mode)"
+              echo "WARNING: Continuing (non-blocking mode)"
               exit 0
             fi
           elif [ "$SCAN_STATUS" = "SCAN_ELIGIBILITY_EXPIRED" ] || [ "$SCAN_STATUS" = "FINDINGS_UNAVAILABLE" ]; then
-            echo "WARNING Scan findings not available"
+            echo "WARNING: Scan findings not available"
             if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
               exit 1
             else
-              echo "WARNING Continuing (non-blocking mode)"
+              echo "WARNING: Continuing (non-blocking mode)"
               exit 0
             fi
           elif [ "$SCAN_STATUS" = "IN_PROGRESS" ] || [ "$SCAN_STATUS" = "PENDING" ]; then
             echo "Scan in progress, waiting..."
           else
-            echo "WARNING Unknown scan status $SCAN_STATUS, treating as in progress"
+            echo "WARNING: Unknown scan status '$SCAN_STATUS', treating as in progress"
           fi
           sleep $WAIT_INTERVAL
           ELAPSED=$((ELAPSED + WAIT_INTERVAL))
         done
+        set -e  # Re-enable exit on error
+        
         if [ $ELAPSED -ge $MAX_WAIT ]; then
-          echo "WARNING Scan did not complete within $MAX_WAIT seconds"
-          echo "Last status was $SCAN_STATUS"
+          echo "WARNING: Scan did not complete within $MAX_WAIT seconds"
+          echo "Last status was: $SCAN_STATUS"
           if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
-            echo "ERROR Blocking deployment due to scan timeout in blocking mode"
+            echo "ERROR: Blocking deployment due to scan timeout in blocking mode"
             exit 1
           else
-            echo "WARNING Continuing despite scan timeout (non-blocking mode)"
+            echo "WARNING: Continuing despite scan timeout (non-blocking mode)"
             exit 0
           fi
         fi
       - echo "Retrieving AWS Inspector scan findings..."
       - |
+        set +e
         SCAN_FINDINGS=$(aws ecr describe-image-scan-findings \
           --repository-name "${ECR_REPOSITORY_NAME}" \
           --image-id imageTag="${IMAGE_TAG}" \
           --region "${AWS_DEFAULT_REGION}" 2>&1)
+        SCAN_EXIT_CODE=$?
+        set -e
         
-        if [ $? -ne 0 ]; then
-          echo "WARNING Could not retrieve AWS Inspector scan findings"
+        if [ $SCAN_EXIT_CODE -ne 0 ]; then
+          echo "WARNING: Could not retrieve AWS Inspector scan findings"
           echo "$SCAN_FINDINGS"
           if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
-            echo "ERROR Blocking deployment due to scan retrieval failure"
+            echo "ERROR: Blocking deployment due to scan retrieval failure"
             exit 1
           else
-            echo "WARNING Continuing despite scan retrieval failure (non-blocking mode)"
+            echo "WARNING: Continuing despite scan retrieval failure (non-blocking mode)"
             exit 0
           fi
         fi
+        
         echo "Successfully retrieved scan findings from AWS Inspector"
+        
         CRITICAL_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0')
         HIGH_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0')
         MEDIUM_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.MEDIUM // 0')
@@ -156,12 +164,14 @@ phases:
         echo "Blocking Mode $BLOCK_ON_CRITICAL"
         echo "Override      $ALLOW_OVERRIDE"
         echo "=========================================="
+        
         export CRITICAL_COUNT
         export HIGH_COUNT
         export MEDIUM_COUNT
         export LOW_COUNT
         export INFORMATIONAL_COUNT
         export UNDEFINED_COUNT
+        
         echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json        
   post_build:
     commands:
