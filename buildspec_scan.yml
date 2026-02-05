@@ -169,7 +169,7 @@ phases:
         export INFORMATIONAL_COUNT
         export UNDEFINED_COUNT
         
-        echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json        
+        echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json
   post_build:
     commands:
       - |
