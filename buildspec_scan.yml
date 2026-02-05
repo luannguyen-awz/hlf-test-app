@@ -121,14 +121,18 @@ phases:
         fi
       - echo "Retrieving AWS Inspector scan findings..."
       - echo "Fetching scan results from ECR..."
-      - set +e
-      - SCAN_FINDINGS=$(aws ecr describe-image-scan-findings --repository-name "${ECR_REPOSITORY_NAME}" --image-id imageTag="${IMAGE_TAG}" --region "${AWS_DEFAULT_REGION}" 2>&1)
-      - SCAN_EXIT_CODE=$?
-      - set -e
       - |
+        set +e
+        aws ecr describe-image-scan-findings \
+          --repository-name "${ECR_REPOSITORY_NAME}" \
+          --image-id imageTag="${IMAGE_TAG}" \
+          --region "${AWS_DEFAULT_REGION}" > scan-findings.json 2>&1
+        SCAN_EXIT_CODE=$?
+        set -e
+        
         if [ $SCAN_EXIT_CODE -ne 0 ]; then
           echo "WARNING: Could not retrieve AWS Inspector scan findings"
-          echo "$SCAN_FINDINGS"
+          cat scan-findings.json
           if [ "$BLOCK_ON_CRITICAL" = "true" ]; then
             echo "ERROR: Blocking deployment due to scan retrieval failure"
             exit 1
@@ -139,12 +143,12 @@ phases:
         fi
       - echo "Successfully retrieved scan findings from AWS Inspector"
       - |
-        CRITICAL_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0')
-        HIGH_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0')
-        MEDIUM_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.MEDIUM // 0')
-        LOW_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.LOW // 0')
-        INFORMATIONAL_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.INFORMATIONAL // 0')
-        UNDEFINED_COUNT=$(echo "$SCAN_FINDINGS" | jq -r '.imageScanFindings.findingSeverityCounts.UNDEFINED // 0')
+        CRITICAL_COUNT=$(jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0' scan-findings.json)
+        HIGH_COUNT=$(jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0' scan-findings.json)
+        MEDIUM_COUNT=$(jq -r '.imageScanFindings.findingSeverityCounts.MEDIUM // 0' scan-findings.json)
+        LOW_COUNT=$(jq -r '.imageScanFindings.findingSeverityCounts.LOW // 0' scan-findings.json)
+        INFORMATIONAL_COUNT=$(jq -r '.imageScanFindings.findingSeverityCounts.INFORMATIONAL // 0' scan-findings.json)
+        UNDEFINED_COUNT=$(jq -r '.imageScanFindings.findingSeverityCounts.UNDEFINED // 0' scan-findings.json)
         export CRITICAL_COUNT
         export HIGH_COUNT
         export MEDIUM_COUNT
@@ -165,7 +169,6 @@ phases:
       - echo "Blocking Mode $BLOCK_ON_CRITICAL"
       - echo "Override      $ALLOW_OVERRIDE"
       - echo "=========================================="
-      - echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json
   post_build:
     commands:
       - |
