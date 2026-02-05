@@ -1,0 +1,144 @@
+version: 0.2
+
+# CodeBuild BuildSpec for Image Promotion from SIT to UAT/PROD
+# This buildspec pulls the Docker image from SIT ECR, retags it, and pushes to target environment ECR
+# Trigger: Git tag (uat-*, prod-*)
+# Flow: Pull SIT image by short-hash -> Retag with environment version -> Push to target ECR
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "ap-southeast-1"
+    ENVIRONMENT: "uat"  # Override in CodePipeline: uat/prod
+    TARGET_ECR_REPOSITORY_NAME: "hlf-lab-ecr-uat-test-app"
+    SIT_ACCOUNT_ID: ""  # Override in CodePipeline if cross-account
+    SIT_ECR_REPOSITORY_NAME: "hlf-lab-ecr-sit-test-app"
+    DOCKER_BUILDKIT: "1"
+
+phases:
+  pre_build:
+    commands:
+      - echo "=========================================="
+      - echo "Image Promotion from SIT to ${ENVIRONMENT}"
+      - echo "=========================================="
+      - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - |
+        # Extract version from git tag (e.g., uat-1.0.1 or prod-1.0.1)
+        if [ -n "${CODEBUILD_WEBHOOK_TRIGGER}" ]; then
+          export GIT_TAG=$(echo ${CODEBUILD_WEBHOOK_TRIGGER} | sed 's/tag\///')
+        elif [ -n "${CODEBUILD_SOURCE_VERSION}" ]; then
+          export GIT_TAG=${CODEBUILD_SOURCE_VERSION}
+        else
+          echo "ERROR: Cannot determine git tag"
+          exit 1
+        fi
+        echo "Git Tag: ${GIT_TAG}"
+        
+        # Extract short commit hash (first 7 characters of commit SHA)
+        export SHORT_HASH=$(git rev-parse --short=7 HEAD)
+        echo "Short Hash: ${SHORT_HASH}"
+      
+      - echo "Target Environment: ${ENVIRONMENT}"
+      - echo "Target ECR: ${TARGET_ECR_REPOSITORY_NAME}"
+      - echo "Source SIT Account: ${SIT_ACCOUNT_ID}"
+      - echo "Source SIT ECR: ${SIT_ECR_REPOSITORY_NAME}"
+      - echo "=========================================="
+      
+      # Setup ECR URIs
+      - export TARGET_ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${TARGET_ECR_REPOSITORY_NAME}"
+      - |
+        if [ -z "${SIT_ACCOUNT_ID}" ] || [ "${SIT_ACCOUNT_ID}" = "${AWS_ACCOUNT_ID}" ]; then
+          export SIT_ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${SIT_ECR_REPOSITORY_NAME}"
+          export CROSS_ACCOUNT=false
+        else
+          export SIT_ECR_URI="${SIT_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${SIT_ECR_REPOSITORY_NAME}"
+          export CROSS_ACCOUNT=true
+        fi
+      - echo "Target ECR URI: ${TARGET_ECR_URI}"
+      - echo "SIT ECR URI: ${SIT_ECR_URI}"
+      - echo "Cross-Account: ${CROSS_ACCOUNT}"
+      
+      # Login to target ECR
+      - echo "Logging in to target ${ENVIRONMENT} ECR..."
+      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${TARGET_ECR_URI}
+      
+      # Login to SIT ECR (cross-account if needed)
+      - |
+        if [ "${CROSS_ACCOUNT}" = "true" ]; then
+          echo "Logging in to SIT ECR (cross-account)..."
+          # Assume role if needed - role should be configured in CodeBuild role
+          aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${SIT_ECR_URI}
+        else
+          echo "Using same account for SIT ECR"
+        fi
+      - echo "=========================================="
+
+  build:
+    commands:
+      - echo "Pulling image from SIT ECR..."
+      - export SIT_IMAGE_URI="${SIT_ECR_URI}:${SHORT_HASH}"
+      - echo "Pulling: ${SIT_IMAGE_URI}"
+      - |
+        if docker pull ${SIT_IMAGE_URI}; then
+          echo "Successfully pulled image from SIT ECR"
+        else
+          echo "=========================================="
+          echo "WARNING: Failed to pull image from SIT ECR"
+          echo "=========================================="
+          echo "Image: ${SIT_IMAGE_URI} not found"
+          echo "This may happen if:"
+          echo "  1. Image was not built in SIT"
+          echo "  2. Short hash does not match SIT build"
+          echo "  3. Cross-account permissions not configured"
+          echo ""
+          echo "Falling back to building image from source..."
+          echo "=========================================="
+          
+          # Fallback: Build from source
+          docker build --tag temp-build:${SHORT_HASH} --build-arg BUILDKIT_INLINE_CACHE=1 .
+          export SIT_IMAGE_URI="temp-build:${SHORT_HASH}"
+          
+          echo "=========================================="
+          echo "WARNING: Image built from source in ${ENVIRONMENT}"
+          echo "WARNING: This should not happen in production flow"
+          echo "WARNING: Please investigate why SIT image was not available"
+          echo "=========================================="
+        fi
+      
+      - echo "Tagging image for ${ENVIRONMENT}..."
+      - docker tag ${SIT_IMAGE_URI} ${TARGET_ECR_URI}:${GIT_TAG}
+      - docker tag ${SIT_IMAGE_URI} ${TARGET_ECR_URI}:latest
+      - echo "Tagged as: ${TARGET_ECR_URI}:${GIT_TAG}"
+      - echo "Tagged as: ${TARGET_ECR_URI}:latest"
+      - docker images | grep ${TARGET_ECR_REPOSITORY_NAME}
+
+  post_build:
+    commands:
+      - echo "Pushing image to ${ENVIRONMENT} ECR..."
+      - docker push ${TARGET_ECR_URI}:${GIT_TAG}
+      - docker push ${TARGET_ECR_URI}:latest
+      - echo "Image pushed to ECR successfully"
+      - echo "=========================================="
+      - echo "Image Promotion Complete"
+      - echo "=========================================="
+      - echo "Environment ${ENVIRONMENT}"
+      - echo "Git Tag ${GIT_TAG}"
+      - echo "Source ${SIT_IMAGE_URI}"
+      - echo "Target ${TARGET_ECR_URI}:${GIT_TAG}"
+      - echo "ECR Console https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${TARGET_ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}"
+      - echo ""
+      - echo "Next Stage AWS Inspector Vulnerability Scan"
+      - echo "Scan will validate image before deployment"
+      - echo "=========================================="
+      - printf '{"imageTag":"%s","imageUri":"%s:%s","repository":"%s","gitTag":"%s","shortHash":"%s"}\n' "${GIT_TAG}" "${TARGET_ECR_URI}" "${GIT_TAG}" "${TARGET_ECR_REPOSITORY_NAME}" "${GIT_TAG}" "${SHORT_HASH}" > build-output.json
+      - cat build-output.json
+
+artifacts:
+  files:
+    - build-output.json
+    - buildspec_scan.yml
+    - buildspec_module.yml
+    - scripts/**/*
+    - script/**/*
+    - manifests/**/*
+    - charts/**/*
+  name: promotion-artifacts

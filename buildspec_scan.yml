@@ -160,40 +160,7 @@ phases:
         export LOW_COUNT
         export INFORMATIONAL_COUNT
         export UNDEFINED_COUNT
-        echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json
-        echo "========================================" > scan-summary.txt
-        echo "AWS Inspector Vulnerability Scan Report" >> scan-summary.txt
-        echo "========================================" >> scan-summary.txt
-        echo "Scan Engine: AWS Inspector (Enhanced Scanning)" >> scan-summary.txt
-        echo "Environment: $ENVIRONMENT" >> scan-summary.txt
-        echo "Repository: $ECR_REPOSITORY_NAME" >> scan-summary.txt
-        echo "Image Tag: $IMAGE_TAG" >> scan-summary.txt
-        echo "Scan Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> scan-summary.txt
-        echo "" >> scan-summary.txt
-        echo "Policy Configuration:" >> scan-summary.txt
-        echo "---------------------" >> scan-summary.txt
-        echo "Block on Critical: $BLOCK_ON_CRITICAL" >> scan-summary.txt
-        echo "Allow Override: $ALLOW_OVERRIDE" >> scan-summary.txt
-        echo "Notification: $ENABLE_NOTIFICATION" >> scan-summary.txt
-        echo "" >> scan-summary.txt
-        echo "Vulnerability Findings:" >> scan-summary.txt
-        echo "-----------------------" >> scan-summary.txt
-        echo "CRITICAL:      $CRITICAL_COUNT" >> scan-summary.txt
-        echo "HIGH:          $HIGH_COUNT" >> scan-summary.txt
-        echo "MEDIUM:        $MEDIUM_COUNT" >> scan-summary.txt
-        echo "LOW:           $LOW_COUNT" >> scan-summary.txt
-        echo "INFORMATIONAL: $INFORMATIONAL_COUNT" >> scan-summary.txt
-        echo "UNDEFINED:     $UNDEFINED_COUNT" >> scan-summary.txt
-        echo "" >> scan-summary.txt
-        echo "Console Link:" >> scan-summary.txt
-        echo "https://console.aws.amazon.com/ecr/repositories/private/${AWS_ACCOUNT_ID}/${ECR_REPOSITORY_NAME}?region=${AWS_DEFAULT_REGION}" >> scan-summary.txt
-        echo "" >> scan-summary.txt
-        echo "AWS Inspector Console:" >> scan-summary.txt
-        echo "https://console.aws.amazon.com/inspector/v2/home?region=${AWS_DEFAULT_REGION}#/findings" >> scan-summary.txt
-        echo "========================================" >> scan-summary.txt
-        
-        cat scan-summary.txt
-        
+        echo "$SCAN_FINDINGS" | jq '.' > scan-findings.json        
   post_build:
     commands:
       - |
@@ -305,5 +272,4 @@ phases:
 artifacts:
   files:
     - scan-findings.json
-    - scan-summary.txt
   name: scan-results
