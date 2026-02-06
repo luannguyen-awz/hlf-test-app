@@ -3,7 +3,7 @@
 # Configuration
 ENV ?= sit
 AWS_REGION ?= ap-southeast-1
-AWS_ACCOUNT_ID ?= 337608386221
+AWS_ACCOUNT_ID ?= 555631499450
 ECR_REPOSITORY ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/hlf-ecr-$(ENV)-static-app
 IMAGE_TAG ?= latest
 EKS_CLUSTER_NAME ?= hlf-eks-$(ENV)

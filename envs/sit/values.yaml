@@ -3,7 +3,7 @@
 replicaCount: 2
 
 image:
-  repository: 337608386221.dkr.ecr.ap-southeast-1.amazonaws.com/hlf-ecr-sit-static-app
+  repository: 555631499450.dkr.ecr.ap-southeast-1.amazonaws.com/hlf-ecr-sit-static-app
   pullPolicy: Always
   tag: "latest"
 
