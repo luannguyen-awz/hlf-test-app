@@ -95,12 +95,15 @@ app:
   port: 8080
 
 # Persistent storage (EFS)
+# Uses shared PVC from hlf-cluster-base chart (modules/chart)
+# Since Fargate doesn't support dynamic provisioning, all apps share one PVC
+# Each app should use a unique subPath to isolate data
 persistence:
   enabled: true
-  size: 10Gi
   mountPath: /app/data
-  storageClass: efs-sc
-  # For static PV binding (Fargate): set storageClassName: "" in environment values
-  # For dynamic provisioning (EC2): use storageClass: efs-sc
-  # Set existingClaim only if you want to use an externally managed PVC
-  existingClaim: ""
+  # Use the shared PVC created by base infrastructure chart
+  existingClaim: "hlf-efs-shared"
+  # Namespace where the shared PVC is created (must have Fargate profile)
+  existingClaimNamespace: "default"
+  # SubPath to isolate this app's data within the shared volume
+  subPath: "test-app"

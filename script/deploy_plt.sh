@@ -24,7 +24,7 @@ kubectl get nodes
 
 # Get EFS File System ID from CloudFormation
 echo "=========================================="
-echo "Getting EFS File System ID from CloudFormation..."
+echo "Getting EFS File System ID and Access Point ID from CloudFormation..."
 echo "=========================================="
 
 # Get the Storage Stack ID
@@ -55,6 +55,20 @@ fi
 
 echo "EFS File System ID: ${EFS_FILE_SYSTEM_ID}"
 
+# Get EFS Access Point ID from Storage Stack
+EFS_ACCESS_POINT_ID=$(aws cloudformation describe-stacks \
+    --stack-name "${STORAGE_STACK_ID}" \
+    --region "${AWS_REGION}" \
+    --query 'Stacks[0].Outputs[?OutputKey==`EFSAccessPointAppId`].OutputValue' \
+    --output text)
+
+if [ -z "$EFS_ACCESS_POINT_ID" ]; then
+    echo "ERROR: Could not retrieve EFS Access Point ID from CloudFormation"
+    exit 1
+fi
+
+echo "EFS Access Point ID: ${EFS_ACCESS_POINT_ID}"
+
 # Deploy EFS StorageClass
 echo "=========================================="
 echo "Deploying EFS Storage (Static PV for Fargate)..."
@@ -73,7 +87,7 @@ if [ -f "./manifests/storage/efs-pv-static.yaml" ]; then
     
     echo "EFS PV created successfully"
     kubectl get pv | grep efs || true
-    echo "Note: Applications will create their own PVCs to bind to this PV"
+    echo "Note: Applications use shared PVC (hlf-efs-shared) with unique subPath for data isolation"
 else
     echo "WARNING: EFS PV manifest not found"
 fi

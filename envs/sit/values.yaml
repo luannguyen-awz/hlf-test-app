@@ -42,10 +42,12 @@ service:
   targetPort: 8080
 
 # Enable EFS persistent storage for SIT
+# Uses shared PVC from hlf-cluster-base chart
 persistence:
   enabled: true
-  size: 10Gi
   mountPath: /app/data
-  storageClass: ""  # Empty storageClass for static PV binding (Fargate)
-  existingClaim: ""  # App creates its own PVC to bind to static PV
+  existingClaim: "hlf-efs-shared"
+  existingClaimNamespace: "default"
+  subPath: "test-app"
+
 

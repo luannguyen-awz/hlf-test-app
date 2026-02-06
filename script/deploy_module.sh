@@ -182,22 +182,55 @@ echo "Using image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
 
 # Deploy the test application with RDS connection info from CloudFormation
 # Note: SecurityGroupPolicy and ExternalSecret are now managed as Helm templates
-helm upgrade --install test-app ./charts/test-app \
-    --namespace ${APP_NAMESPACE} \
-    --set image.repository=${ECR_REPOSITORY} \
-    --set image.tag=${IMAGE_TAG} \
-    --set environment=${ENVIRONMENT} \
-    --set database.host=${DB_HOST} \
-    --set database.port=${DB_PORT} \
-    --set database.name=${DB_NAME} \
-    --set database.username=${DB_USERNAME} \
-    --set securityGroups.eksClusterSecurityGroupId=${EKS_CLUSTER_SG_ID} \
-    --set securityGroups.eksPodSecurityGroupId=${EKS_POD_SG_ID} \
-    --set externalSecrets.rdsSecretKey=${RDS_SECRET_NAME} \
-    --values ./envs/${ENVIRONMENT}/values.yaml \
-    --wait --timeout 5m
 
-echo "Application deployed successfully"
+# Check if release already exists
+if helm list -n ${APP_NAMESPACE} | grep -q "^test-app"; then
+    echo "Release test-app already exists. Checking for changes..."
+    
+    # Get current revision
+    CURRENT_REVISION=$(helm list -n ${APP_NAMESPACE} -o json | jq -r '.[] | select(.name=="test-app") | .revision')
+    
+    helm upgrade test-app ./charts/test-app \
+        --namespace ${APP_NAMESPACE} \
+        --set image.repository=${ECR_REPOSITORY} \
+        --set image.tag=${IMAGE_TAG} \
+        --set environment=${ENVIRONMENT} \
+        --set database.host=${DB_HOST} \
+        --set database.port=${DB_PORT} \
+        --set database.name=${DB_NAME} \
+        --set database.username=${DB_USERNAME} \
+        --set securityGroups.eksClusterSecurityGroupId=${EKS_CLUSTER_SG_ID} \
+        --set securityGroups.eksPodSecurityGroupId=${EKS_POD_SG_ID} \
+        --set externalSecrets.rdsSecretKey=${RDS_SECRET_NAME} \
+        --values ./envs/${ENVIRONMENT}/values.yaml \
+        --wait --timeout 5m > /dev/null 2>&1
+    
+    # Get new revision
+    NEW_REVISION=$(helm list -n ${APP_NAMESPACE} -o json | jq -r '.[] | select(.name=="test-app") | .revision')
+    
+    if [ "$CURRENT_REVISION" = "$NEW_REVISION" ]; then
+        echo "No changes detected. Release unchanged (revision ${CURRENT_REVISION})"
+    else
+        echo "Application upgraded (revision ${CURRENT_REVISION} → ${NEW_REVISION})"
+    fi
+else
+    helm install test-app ./charts/test-app \
+        --namespace ${APP_NAMESPACE} \
+        --set image.repository=${ECR_REPOSITORY} \
+        --set image.tag=${IMAGE_TAG} \
+        --set environment=${ENVIRONMENT} \
+        --set database.host=${DB_HOST} \
+        --set database.port=${DB_PORT} \
+        --set database.name=${DB_NAME} \
+        --set database.username=${DB_USERNAME} \
+        --set securityGroups.eksClusterSecurityGroupId=${EKS_CLUSTER_SG_ID} \
+        --set securityGroups.eksPodSecurityGroupId=${EKS_POD_SG_ID} \
+        --set externalSecrets.rdsSecretKey=${RDS_SECRET_NAME} \
+        --values ./envs/${ENVIRONMENT}/values.yaml \
+        --wait --timeout 5m > /dev/null 2>&1
+    
+    echo "Application deployed successfully"
+fi
 
 # Wait for External Secrets to sync
 echo "Waiting for External Secrets to sync..."
