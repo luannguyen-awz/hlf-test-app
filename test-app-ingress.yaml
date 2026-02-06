@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: test-app-ingress
+  name: app-ingress
   namespace: default
   annotations:
     # AWS Load Balancer Controller annotations
@@ -26,6 +26,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: test-app
+            name: app
             port:
               number: 80

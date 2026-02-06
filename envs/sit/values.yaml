@@ -3,7 +3,7 @@
 replicaCount: 2
 
 image:
-  repository: 337608386221.dkr.ecr.ap-southeast-1.amazonaws.com/hlf-ecr-sit-test-app
+  repository: 337608386221.dkr.ecr.ap-southeast-1.amazonaws.com/hlf-ecr-sit-app
   pullPolicy: Always
   tag: "latest"
 
@@ -48,6 +48,6 @@ persistence:
   mountPath: /app/data
   existingClaim: "hlf-efs-shared"
   existingClaimNamespace: "default"
-  subPath: "test-app"
+  subPath: "app"
 
 

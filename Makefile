@@ -4,7 +4,7 @@
 ENV ?= sit
 AWS_REGION ?= ap-southeast-1
 AWS_ACCOUNT_ID ?= 337608386221
-ECR_REPOSITORY ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/hlf-ecr-$(ENV)-test-app
+ECR_REPOSITORY ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/hlf-ecr-$(ENV)-app
 IMAGE_TAG ?= latest
 EKS_CLUSTER_NAME ?= hlf-eks-$(ENV)
 APP_NAMESPACE ?= default
@@ -31,14 +31,14 @@ test: ## Run tests
 	npm test
 
 docker-build: ## Build Docker image
-	docker build -t hlf-test-app:$(IMAGE_TAG) .
+	docker build -t hlf-app:$(IMAGE_TAG) .
 
 docker-run: ## Run Docker container locally
 	docker run -p 8080:8080 \
 		-e ENVIRONMENT=development \
 		-e LOG_LEVEL=debug \
 		-e PORT=8080 \
-		hlf-test-app:$(IMAGE_TAG)
+		hlf-app:$(IMAGE_TAG)
 
 ecr-login: ## Login to AWS ECR
 	aws ecr get-login-password --region $(AWS_REGION) | \
@@ -63,31 +63,31 @@ deploy: update-kubeconfig ## Deploy to Kubernetes
 	./script/deploy_module.sh
 
 helm-lint: ## Lint Helm charts
-	helm lint ./charts/test-app
+	helm lint ./charts/app
 
 helm-template: ## Generate Kubernetes manifests from Helm chart
-	helm template test-app ./charts/test-app \
+	helm template app ./charts/app \
 		--namespace $(APP_NAMESPACE) \
 		--values ./envs/$(ENV)/values.yaml
 
 helm-install: update-kubeconfig ## Install Helm chart
-	helm upgrade --install test-app ./charts/test-app \
+	helm upgrade --install app ./charts/app \
 		--namespace $(APP_NAMESPACE) \
 		--values ./envs/$(ENV)/values.yaml \
 		--wait --timeout 5m
 
 helm-uninstall: update-kubeconfig ## Uninstall Helm chart
-	helm uninstall test-app -n $(APP_NAMESPACE)
+	helm uninstall app -n $(APP_NAMESPACE)
 
 k8s-logs: update-kubeconfig ## View Kubernetes logs
-	kubectl logs -f deployment/test-app -n $(APP_NAMESPACE)
+	kubectl logs -f deployment/app -n $(APP_NAMESPACE)
 
 k8s-status: update-kubeconfig ## Check Kubernetes deployment status
 	@echo "Resources in $(APP_NAMESPACE):"
 	kubectl get all -n $(APP_NAMESPACE)
 
 k8s-describe: update-kubeconfig ## Describe Kubernetes deployment
-	kubectl describe deployment test-app -n $(APP_NAMESPACE)
+	kubectl describe deployment app -n $(APP_NAMESPACE)
 
 k8s-pods: update-kubeconfig ## Get pod details
 	kubectl get pods -n $(APP_NAMESPACE) -o wide

@@ -9,9 +9,9 @@ env:
   variables:
     AWS_DEFAULT_REGION: "ap-southeast-1"
     ENVIRONMENT: "uat"  # Override in CodePipeline: uat/prod
-    TARGET_ECR_REPOSITORY_NAME: "hlf-ecr-uat-test-app"
+    TARGET_ECR_REPOSITORY_NAME: "hlf-ecr-uat-app"
     SIT_ACCOUNT_ID: ""  # Override in CodePipeline if cross-account
-    SIT_ECR_REPOSITORY_NAME: "hlf-ecr-sit-test-app"
+    SIT_ECR_REPOSITORY_NAME: "hlf-ecr-sit-app"
     DOCKER_BUILDKIT: "1"
 
 phases:

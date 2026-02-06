@@ -1,4 +1,4 @@
-# Default values for test-app
+# Default values for app
 replicaCount: 2
 
 image:
@@ -39,7 +39,7 @@ ingress:
   className: "nginx"
   annotations: {}
   hosts:
-    - host: test-app.local
+    - host: app.local
       paths:
         - path: /
           pathType: Prefix
@@ -106,4 +106,4 @@ persistence:
   # Namespace where the shared PVC is created (must have Fargate profile)
   existingClaimNamespace: "default"
   # SubPath to isolate this app's data within the shared volume
-  subPath: "test-app"
+  subPath: "app"

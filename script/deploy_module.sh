@@ -12,7 +12,7 @@ CLUSTER_NAME="${EKS_CLUSTER_NAME}"
 APP_NAMESPACE="${APP_NAMESPACE:-default}"
 PROJECT_NAME="${PROJECT_NAME:-hlf}"
 STACK_NAME="${PROJECT_NAME}-${ENVIRONMENT}-stack"
-APPLICATION_PREFIX="${APPLICATION_PREFIX:-test-app}"
+APPLICATION_PREFIX="${APPLICATION_PREFIX:-app}"
 
 echo "Environment: ${ENVIRONMENT}"
 echo "AWS Region: ${AWS_REGION}"
@@ -184,13 +184,13 @@ echo "Using image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
 # Note: SecurityGroupPolicy and ExternalSecret are now managed as Helm templates
 
 # Check if release already exists
-if helm list -n ${APP_NAMESPACE} | grep -q "^test-app"; then
-    echo "Release test-app already exists. Checking for changes..."
+if helm list -n ${APP_NAMESPACE} | grep -q "^app"; then
+    echo "Release app already exists. Checking for changes..."
     
     # Get current revision
-    CURRENT_REVISION=$(helm list -n ${APP_NAMESPACE} -o json | jq -r '.[] | select(.name=="test-app") | .revision')
+    CURRENT_REVISION=$(helm list -n ${APP_NAMESPACE} -o json | jq -r '.[] | select(.name=="app") | .revision')
     
-    helm upgrade test-app ./charts/test-app \
+    helm upgrade app ./charts/app \
         --namespace ${APP_NAMESPACE} \
         --set image.repository=${ECR_REPOSITORY} \
         --set image.tag=${IMAGE_TAG} \
@@ -206,7 +206,7 @@ if helm list -n ${APP_NAMESPACE} | grep -q "^test-app"; then
         --wait --timeout 5m > /dev/null 2>&1
     
     # Get new revision
-    NEW_REVISION=$(helm list -n ${APP_NAMESPACE} -o json | jq -r '.[] | select(.name=="test-app") | .revision')
+    NEW_REVISION=$(helm list -n ${APP_NAMESPACE} -o json | jq -r '.[] | select(.name=="app") | .revision')
     
     if [ "$CURRENT_REVISION" = "$NEW_REVISION" ]; then
         echo "No changes detected. Release unchanged (revision ${CURRENT_REVISION})"
@@ -214,7 +214,7 @@ if helm list -n ${APP_NAMESPACE} | grep -q "^test-app"; then
         echo "Application upgraded (revision ${CURRENT_REVISION} → ${NEW_REVISION})"
     fi
 else
-    helm install test-app ./charts/test-app \
+    helm install app ./charts/app \
         --namespace ${APP_NAMESPACE} \
         --set image.repository=${ECR_REPOSITORY} \
         --set image.tag=${IMAGE_TAG} \
