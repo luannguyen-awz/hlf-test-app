@@ -4,7 +4,7 @@ env:
      AWS_DEFAULT_REGION: "ap-southeast-1"
      EKS_CLUSTER_NAME: "hlf-eks-sit-cluster"
      CIS_ENABLE: "false"
-     ECR_REPOSITORY_NAME: "hlf-ecr-sit-app"
+     ECR_REPOSITORY_NAME: "hlf-ecr-sit-static-app"
 
 phases:
   pre_build:

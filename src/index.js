@@ -88,7 +88,7 @@ app.get('/ready', async (req, res) => {
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'HLF Test Application',
+    message: 'HLF Static Application',
     environment: ENVIRONMENT,
     version: '1.0.0',
     timestamp: new Date().toISOString()
@@ -98,7 +98,7 @@ app.get('/', (req, res) => {
 // Info endpoint
 app.get('/info', (req, res) => {
   res.json({
-    application: 'hlf-test-app',
+    application: 'hlf-static-app',
     version: '1.0.0',
     environment: ENVIRONMENT,
     node_version: process.version,

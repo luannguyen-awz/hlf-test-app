@@ -9,7 +9,7 @@ env:
   variables:
     AWS_DEFAULT_REGION: "ap-southeast-1"
     ENVIRONMENT: "sit"  # Override in CodePipeline: sit/uat/prod
-    ECR_REPOSITORY_NAME: "hlf-ecr-sit-app"
+    ECR_REPOSITORY_NAME: "hlf-ecr-sit-static-app"
     # AWS Inspector Scan Configuration (environment-specific)
     # SIT: Warn only, no notifications
     # UAT: Warn only, enable notifications  

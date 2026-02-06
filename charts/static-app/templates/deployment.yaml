@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "app.fullname" . }}
+  name: {{ include "static-app.fullname" . }}
   labels:
-    {{- include "app.labels" . | nindent 4 }}
+    {{- include "static-app.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "app.selectorLabels" . | nindent 6 }}
+      {{- include "static-app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,13 +18,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "app.selectorLabels" . | nindent 8 }}
+        {{- include "static-app.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "app.serviceAccountName" . }}
+      serviceAccountName: {{ include "static-app.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -39,14 +39,14 @@ spec:
           protocol: TCP
         envFrom:
         - configMapRef:
-            name: {{ include "app.fullname" . }}-config
+            name: {{ include "static-app.fullname" . }}-config
         env:
         {{- if .Values.database.enabled }}
         # Database password from External Secrets
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "app.fullname" . }}-database-secret
+              name: {{ include "static-app.fullname" . }}-database-secret
               key: DB_PASSWORD
               optional: true
         {{- end }}
@@ -83,7 +83,7 @@ spec:
           {{- if .Values.persistence.existingClaim }}
           claimName: {{ .Values.persistence.existingClaim }}
           {{- else }}
-          claimName: {{ include "app.fullname" . }}-data
+          claimName: {{ include "static-app.fullname" . }}-data
           {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
