@@ -20,6 +20,14 @@ autoscaling:
 
 environment: sit
 
+# External Secrets configuration
+externalSecrets:
+  enabled: true
+  secretStoreName: aws-secrets-manager-global
+  # RDS Secret format: rds!cluster-{UUID} or full ARN path
+  # Get this from CloudFormation RDS stack outputs: MasterUserSecretName
+  rdsSecretKey: ""  # TODO: Set this to the RDS master user secret name from CloudFormation output
+
 # Database configuration (from RDS stack)
 database:
   enabled: true
