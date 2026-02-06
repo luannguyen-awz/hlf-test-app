@@ -2,9 +2,9 @@ version: 0.2
 env:
   variables:
      AWS_DEFAULT_REGION: "ap-southeast-1"
-     EKS_CLUSTER_NAME: "hlf-lab-eks-sit-cluster"
+     EKS_CLUSTER_NAME: "hlf-eks-sit-cluster"
      CIS_ENABLE: "false"
-     ECR_REPOSITORY_NAME: "hlf-lab-ecr-sit-test-app"
+     ECR_REPOSITORY_NAME: "hlf-ecr-sit-test-app"
 
 phases:
   pre_build:

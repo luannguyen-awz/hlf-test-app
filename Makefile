@@ -4,9 +4,9 @@
 ENV ?= sit
 AWS_REGION ?= ap-southeast-1
 AWS_ACCOUNT_ID ?= 337608386221
-ECR_REPOSITORY ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/hlf-lab-ecr-$(ENV)-test-app
+ECR_REPOSITORY ?= $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/hlf-ecr-$(ENV)-test-app
 IMAGE_TAG ?= latest
-EKS_CLUSTER_NAME ?= hlf-lab-eks-$(ENV)
+EKS_CLUSTER_NAME ?= hlf-eks-$(ENV)
 APP_NAMESPACE ?= default
 
 help: ## Show this help message
@@ -31,14 +31,14 @@ test: ## Run tests
 	npm test
 
 docker-build: ## Build Docker image
-	docker build -t hlf-lab-test-app:$(IMAGE_TAG) .
+	docker build -t hlf-test-app:$(IMAGE_TAG) .
 
 docker-run: ## Run Docker container locally
 	docker run -p 8080:8080 \
 		-e ENVIRONMENT=development \
 		-e LOG_LEVEL=debug \
 		-e PORT=8080 \
-		hlf-lab-test-app:$(IMAGE_TAG)
+		hlf-test-app:$(IMAGE_TAG)
 
 ecr-login: ## Login to AWS ECR
 	aws ecr get-login-password --region $(AWS_REGION) | \
