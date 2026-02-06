@@ -41,10 +41,10 @@ service:
   port: 80
   targetPort: 8080
 
-# Enable EFS persistent storage for SIT
-# Uses shared PVC from hlf-cluster-base chart
+# Disable EFS persistent storage for SIT (static app doesn't need persistent data)
+# If you need EFS, ensure hlf-efs-shared PVC is created first
 persistence:
-  enabled: true
+  enabled: false
   mountPath: /app/data
   existingClaim: "hlf-efs-shared"
   existingClaimNamespace: "default"
