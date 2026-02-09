@@ -9,7 +9,7 @@ env:
   variables:
     AWS_DEFAULT_REGION: "ap-southeast-1"
     ENVIRONMENT: "sit"
-    ECR_REPOSITORY_NAME: "hlf-ecr-sit-static-app"
+    ECR_REPOSITORY_NAME: "hlf-ecr-sit-test-app"
     # Build configuration
     DOCKER_BUILDKIT: "1"
     
