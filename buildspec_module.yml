@@ -66,7 +66,7 @@ phases:
           export COMMIT_HASH=${CODEBUILD_RESOLVED_SOURCE_VERSION}
           export SHORT_HASH=$(echo ${COMMIT_HASH} | cut -c1-7)
           export IMAGE_TAG=${SHORT_HASH:-latest}
-          export ECR_REPOSITORY_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/hlf-ecr-sit-static-app"
+          export ECR_REPOSITORY_URL="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/hlf-ecr-sit-test-app"
           
           echo "Commit Hash (full)=${COMMIT_HASH}"
           echo "Image Tag (short-hash)=${IMAGE_TAG}"
