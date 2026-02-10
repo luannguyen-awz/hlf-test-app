@@ -99,11 +99,11 @@ app:
 # Since Fargate doesn't support dynamic provisioning, all apps share one PVC
 # Each app should use a unique subPath to isolate data
 persistence:
-  enabled: true
+  enabled: false  # Disabled for Fargate (no EBS support, EFS not configured yet)
   mountPath: /app/data
   # Use the shared PVC created by base infrastructure chart
   existingClaim: "hlf-efs-shared"
   # Namespace where the shared PVC is created (must have Fargate profile)
   existingClaimNamespace: "default"
   # SubPath to isolate this app's data within the shared volume
-  subPath: "static-app"
+  subPath: "test-app"
