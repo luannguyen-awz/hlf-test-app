@@ -7,6 +7,7 @@ env:
     APP_NAMESPACE: "default"
     ENVIRONMENT: "sit"
     MODULE_ENABLE: "true"
+    APPLICATION_PREFIX: "test-app"  # Must match chart name and ECR repo suffix
 
 phases:
   install:
@@ -97,7 +98,7 @@ phases:
           kubectl get securitygrouppolicies -n ${APP_NAMESPACE} || echo "No SecurityGroupPolicy found"
           
           echo "Checking application pods status..."
-          kubectl get pods -n ${APP_NAMESPACE} -l app.kubernetes.io/name=static-app
+          kubectl get pods -n ${APP_NAMESPACE} -l app.kubernetes.io/name=${APPLICATION_PREFIX}
         fi
       
       - echo "=========================================="
