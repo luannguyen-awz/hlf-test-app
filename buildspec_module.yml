@@ -27,9 +27,8 @@ phases:
       
   build:
     commands:
+      - echo "MODULE_ENABLE=$MODULE_ENABLE"
       - |
-        echo "MODULE_ENABLE=$MODULE_ENABLE"
-
         if [ "$MODULE_ENABLE" = "false" ]; then
           echo "Module deployment flag is false. Skipping module deployment..."
         else
